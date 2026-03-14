@@ -1,0 +1,177 @@
+import { Row, Col, Card, Table, Button, Statistic, Tag } from 'antd';
+import { DownloadOutlined } from '@ant-design/icons';
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
+} from 'recharts';
+import { generateMonthlyRevenue } from '../../mock/data';
+import type { ColumnType } from 'antd/es/table';
+
+const monthlyData = generateMonthlyRevenue();
+
+interface SubsidyItem {
+  key: string;
+  date: string;
+  type: string;
+  power: number;
+  duration: number;
+  unitPrice: number;
+  amount: number;
+  status: string;
+}
+
+const subsidyData: SubsidyItem[] = [
+  { key: '1', date: '2026-03-13', type: '调峰补贴', power: 50, duration: 3, unitPrice: 800, amount: 120000, status: '已结算' },
+  { key: '2', date: '2026-03-13', type: '调频补贴', power: 30, duration: 2, unitPrice: 1200, amount: 72000, status: '已结算' },
+  { key: '3', date: '2026-03-12', type: '辅助服务', power: 40, duration: 4, unitPrice: 600, amount: 96000, status: '已结算' },
+  { key: '4', date: '2026-03-12', type: '调峰补贴', power: 45, duration: 3, unitPrice: 800, amount: 108000, status: '结算中' },
+  { key: '5', date: '2026-03-11', type: '备用容量', power: 20, duration: 8, unitPrice: 400, amount: 64000, status: '已结算' },
+  { key: '6', date: '2026-03-11', type: '调频补贴', power: 25, duration: 2, unitPrice: 1200, amount: 60000, status: '已结算' },
+  { key: '7', date: '2026-03-10', type: '辅助服务', power: 35, duration: 3, unitPrice: 600, amount: 63000, status: '待结算' },
+  { key: '8', date: '2026-03-10', type: '调峰补贴', power: 60, duration: 2, unitPrice: 800, amount: 96000, status: '已结算' },
+];
+
+const subsidyColumns: ColumnType<SubsidyItem>[] = [
+  {
+    title: '日期',
+    dataIndex: 'date',
+    render: (v: string) => <span style={{ color: '#6b7280', fontSize: 12 }}>{v}</span>,
+  },
+  {
+    title: '补贴类型',
+    dataIndex: 'type',
+    render: (v: string) => {
+      const colors: Record<string, string> = { '调峰补贴': '#00d4ff', '调频补贴': '#00ff88', '辅助服务': '#ffb800', '备用容量': '#a78bfa' };
+      return <Tag style={{ color: colors[v], borderColor: colors[v], background: `${colors[v]}15` }}>{v}</Tag>;
+    },
+  },
+  {
+    title: '响应功率',
+    dataIndex: 'power',
+    render: (v: number) => <span style={{ color: '#aab4c8' }}>{v} MW</span>,
+  },
+  {
+    title: '持续时长',
+    dataIndex: 'duration',
+    render: (v: number) => <span style={{ color: '#aab4c8' }}>{v} h</span>,
+  },
+  {
+    title: '单价',
+    dataIndex: 'unitPrice',
+    render: (v: number) => <span style={{ color: '#aab4c8' }}>¥{v}/MWh</span>,
+  },
+  {
+    title: '结算金额',
+    dataIndex: 'amount',
+    render: (v: number) => <span style={{ color: '#00ff88', fontWeight: 600 }}>¥{(v / 10000).toFixed(2)}万</span>,
+  },
+  {
+    title: '状态',
+    dataIndex: 'status',
+    render: (v: string) => {
+      const configs: Record<string, string> = { '已结算': 'success', '结算中': 'processing', '待结算': 'warning' };
+      return <Tag color={configs[v]}>{v}</Tag>;
+    },
+  },
+];
+
+const totalRevenue = monthlyData.reduce((a, b) => a + b['总收益'], 0);
+const settled = subsidyData.filter(s => s.status === '已结算').reduce((a, b) => a + b.amount, 0);
+
+export default function Revenue() {
+  return (
+    <div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
+        <div>
+          <h2 style={{ color: '#00d4ff', margin: 0, fontSize: 20, letterSpacing: 1 }}>
+            💰 收益结算
+          </h2>
+          <p style={{ color: '#4a6080', margin: '4px 0 0', fontSize: 12 }}>
+            年度累计收益 ¥{(totalRevenue / 10000).toFixed(1)}万
+          </p>
+        </div>
+        <Button
+          icon={<DownloadOutlined />}
+          style={{ background: '#111827', border: '1px solid rgba(0,212,255,0.2)', color: '#00d4ff' }}
+        >
+          导出报表
+        </Button>
+      </div>
+
+      {/* KPI Summary */}
+      <Row gutter={[16, 16]} style={{ marginBottom: 20 }}>
+        {[
+          { title: '本月收益', value: monthlyData[2]['总收益'], prefix: '¥', suffix: '', color: '#00d4ff' },
+          { title: '已结算金额', value: settled, prefix: '¥', suffix: '', color: '#00ff88' },
+          { title: '结算中金额', value: 108000, prefix: '¥', suffix: '', color: '#ffb800' },
+          { title: '待结算金额', value: 63000, prefix: '¥', suffix: '', color: '#aab4c8' },
+        ].map(item => (
+          <Col key={item.title} xs={12} md={6}>
+            <Card
+              style={{ background: '#111827', border: `1px solid ${item.color}25`, borderRadius: 12 }}
+              bodyStyle={{ padding: '16px 20px' }}
+            >
+              <Statistic
+                title={<span style={{ color: '#6b7280', fontSize: 12 }}>{item.title}</span>}
+                value={item.value}
+                prefix={<span style={{ color: item.color }}>{item.prefix}</span>}
+                valueStyle={{ color: item.color, fontSize: 22, fontWeight: 700 }}
+              />
+            </Card>
+          </Col>
+        ))}
+      </Row>
+
+      {/* Monthly Bar Chart */}
+      <Card
+        title={<span style={{ color: '#00d4ff' }}>月度收益统计（2026年）</span>}
+        style={{ background: '#111827', border: '1px solid rgba(0,212,255,0.15)', borderRadius: 12, marginBottom: 20 }}
+        headStyle={{ background: 'transparent', borderBottom: '1px solid rgba(0,212,255,0.15)' }}
+      >
+        <ResponsiveContainer width="100%" height={280}>
+          <BarChart data={monthlyData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+            <XAxis dataKey="month" stroke="#4a6080" tick={{ fontSize: 12 }} />
+            <YAxis stroke="#4a6080" tick={{ fontSize: 12 }} tickFormatter={(v: number) => `${(v / 10000).toFixed(0)}万`} />
+            <Tooltip
+              contentStyle={{ background: '#1a2540', border: '1px solid #00d4ff', borderRadius: 8 }}
+              formatter={(v) => [`¥${(Number(v) / 10000).toFixed(1)}万`, '']}
+            />
+            <Legend />
+            <Bar dataKey="调峰收益" fill="#00d4ff" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="调频收益" fill="#00ff88" radius={[4, 4, 0, 0]} />
+            <Bar dataKey="辅助服务" fill="#ffb800" radius={[4, 4, 0, 0]} />
+          </BarChart>
+        </ResponsiveContainer>
+      </Card>
+
+      {/* Subsidy Detail Table */}
+      <Card
+        title={<span style={{ color: '#00d4ff' }}>补贴结算明细</span>}
+        style={{ background: '#111827', border: '1px solid rgba(0,212,255,0.15)', borderRadius: 12 }}
+        headStyle={{ background: 'transparent', borderBottom: '1px solid rgba(0,212,255,0.15)' }}
+      >
+        <Table
+          dataSource={subsidyData}
+          columns={subsidyColumns}
+          rowKey="key"
+          pagination={{ pageSize: 10, showTotal: (t) => `共 ${t} 条` }}
+          summary={() => (
+            <Table.Summary>
+              <Table.Summary.Row>
+                <Table.Summary.Cell index={0} colSpan={5}>
+                  <span style={{ color: '#6b7280' }}>合计</span>
+                </Table.Summary.Cell>
+                <Table.Summary.Cell index={5}>
+                  <span style={{ color: '#00ff88', fontWeight: 700 }}>
+                    ¥{(subsidyData.reduce((a, b) => a + b.amount, 0) / 10000).toFixed(2)}万
+                  </span>
+                </Table.Summary.Cell>
+                <Table.Summary.Cell index={6} />
+              </Table.Summary.Row>
+            </Table.Summary>
+          )}
+        />
+      </Card>
+    </div>
+  );
+}
