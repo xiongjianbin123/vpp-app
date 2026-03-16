@@ -1,6 +1,9 @@
 import { useState } from 'react';
-import { Table, Tag, Input, Select, Button, Drawer, Row, Col, Card, Progress } from 'antd';
-import { SearchOutlined, EyeOutlined, ReloadOutlined } from '@ant-design/icons';
+import { Table, Tag, Input, Select, Button, Drawer, Row, Col, Card, Progress, Modal, message, Tooltip } from 'antd';
+import {
+  SearchOutlined, EyeOutlined, ReloadOutlined,
+  PlayCircleOutlined, PauseCircleOutlined, SyncOutlined,
+} from '@ant-design/icons';
 import { mockDevices } from '../../mock/data';
 import type { Device } from '../../mock/data';
 import type { ColumnType } from 'antd/es/table';
@@ -23,17 +26,80 @@ const typeColors: Record<string, string> = {
 };
 
 export default function Devices() {
+  const [devices, setDevices] = useState<Device[]>(mockDevices);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const filtered = mockDevices.filter(d => {
+  const filtered = devices.filter(d => {
     const matchSearch = d.name.includes(search) || d.id.includes(search) || d.location.includes(search);
     const matchType = typeFilter === 'all' || d.type === typeFilter;
     const matchStatus = statusFilter === 'all' || d.status === statusFilter;
     return matchSearch && matchType && matchStatus;
   });
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    setTimeout(() => {
+      setDevices(prev => prev.map(d => ({
+        ...d,
+        currentPower: d.status === '在线'
+          ? parseFloat((d.currentPower * (0.95 + Math.random() * 0.1)).toFixed(1))
+          : d.currentPower,
+        soc: d.soc !== undefined
+          ? Math.min(100, Math.max(0, d.soc + Math.round((Math.random() - 0.4) * 3)))
+          : undefined,
+        lastUpdate: new Date().toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }),
+      })));
+      setRefreshing(false);
+      message.success('数据已刷新');
+    }, 800);
+  };
+
+  const handleToggle = (record: Device) => {
+    const isOnline = record.status === '在线';
+    Modal.confirm({
+      title: isOnline ? '确认停止设备？' : '确认启动设备？',
+      content: `设备：${record.name}`,
+      okText: isOnline ? '停止' : '启动',
+      cancelText: '取消',
+      okButtonProps: {
+        style: { background: isOnline ? '#ff4d4d' : '#00d4ff', border: 'none', color: isOnline ? '#fff' : '#0a0e1a' },
+      },
+      onOk: () => {
+        setDevices(prev => prev.map(d =>
+          d.id === record.id
+            ? { ...d, status: isOnline ? '离线' : '在线', currentPower: isOnline ? 0 : d.capacity * 0.6 }
+            : d
+        ));
+        message.success(`设备 ${record.name} 已${isOnline ? '停止' : '启动'}`);
+      },
+    });
+  };
+
+  const handleRestart = (record: Device) => {
+    Modal.confirm({
+      title: '确认重启设备？',
+      content: `设备：${record.name}，重启期间将短暂离线`,
+      okText: '重启',
+      cancelText: '取消',
+      okButtonProps: { style: { background: '#ffb800', border: 'none', color: '#0a0e1a' } },
+      onOk: () => {
+        setDevices(prev => prev.map(d =>
+          d.id === record.id ? { ...d, status: '维护' } : d
+        ));
+        message.info(`设备 ${record.name} 重启中...`);
+        setTimeout(() => {
+          setDevices(prev => prev.map(d =>
+            d.id === record.id ? { ...d, status: '在线', currentPower: d.capacity * 0.65 } : d
+          ));
+          message.success(`设备 ${record.name} 重启完成`);
+        }, 3000);
+      },
+    });
+  };
 
   const columns: ColumnType<Device>[] = [
     {
@@ -111,15 +177,38 @@ export default function Devices() {
     },
     {
       title: '操作',
+      width: 150,
       render: (_: unknown, record: Device) => (
-        <Button
-          type="link"
-          icon={<EyeOutlined />}
-          style={{ color: '#00d4ff' }}
-          onClick={() => setSelectedDevice(record)}
-        >
-          详情
-        </Button>
+        <div style={{ display: 'flex', gap: 4 }}>
+          <Tooltip title="查看详情">
+            <Button
+              type="link"
+              icon={<EyeOutlined />}
+              size="small"
+              style={{ color: '#00d4ff', padding: '0 4px' }}
+              onClick={() => setSelectedDevice(record)}
+            />
+          </Tooltip>
+          <Tooltip title={record.status === '在线' ? '停止设备' : '启动设备'}>
+            <Button
+              type="link"
+              icon={record.status === '在线' ? <PauseCircleOutlined /> : <PlayCircleOutlined />}
+              size="small"
+              style={{ color: record.status === '在线' ? '#ff4d4d' : '#00ff88', padding: '0 4px' }}
+              onClick={() => handleToggle(record)}
+            />
+          </Tooltip>
+          <Tooltip title="重启设备">
+            <Button
+              type="link"
+              icon={<SyncOutlined />}
+              size="small"
+              style={{ color: '#ffb800', padding: '0 4px' }}
+              onClick={() => handleRestart(record)}
+              disabled={record.status === '维护'}
+            />
+          </Tooltip>
+        </div>
       ),
     },
   ];
@@ -128,27 +217,32 @@ export default function Devices() {
     <div>
       <div style={{ marginBottom: 20 }}>
         <h2 style={{ color: '#00d4ff', margin: 0, fontSize: 20, letterSpacing: 1 }}>
-          🔌 设备资产管理
+          设备资产管理
         </h2>
         <p style={{ color: '#4a6080', margin: '4px 0 0', fontSize: 12 }}>
-          共 {mockDevices.length} 台设备 · 在线 {mockDevices.filter(d => d.status === '在线').length} 台
+          共 {devices.length} 台设备 · 在线 {devices.filter(d => d.status === '在线').length} 台 ·
+          告警 {devices.filter(d => d.status === '告警').length} 台
         </p>
       </div>
 
       {/* Summary Cards */}
       <Row gutter={[16, 16]} style={{ marginBottom: 20 }}>
         {Object.entries({ '光伏电站': '☀️', '储能系统': '🔋', '风电': '💨', '充电桩': '🚗', '工业负荷': '🏭' }).map(([type, icon]) => {
-          const devices = mockDevices.filter(d => d.type === type);
-          const online = devices.filter(d => d.status === '在线').length;
+          const typeDevices = devices.filter(d => d.type === type);
+          const online = typeDevices.filter(d => d.status === '在线').length;
+          const totalPower = typeDevices.reduce((a, d) => a + d.currentPower, 0);
           return (
             <Col key={type} flex="1">
               <Card
                 style={{ background: '#111827', border: `1px solid ${typeColors[type]}30`, borderRadius: 10 }}
-                bodyStyle={{ padding: '12px 16px' }}
+                styles={{ body: { padding: '12px 16px' } }}
               >
                 <div style={{ fontSize: 20, marginBottom: 4 }}>{icon}</div>
                 <div style={{ color: typeColors[type], fontWeight: 600, fontSize: 13 }}>{type}</div>
-                <div style={{ color: '#aab4c8', fontSize: 12 }}>{online}/{devices.length} 在线</div>
+                <div style={{ color: '#aab4c8', fontSize: 12 }}>{online}/{typeDevices.length} 在线</div>
+                <div style={{ color: '#4a6080', fontSize: 11, marginTop: 2 }}>
+                  {totalPower.toFixed(1)} MW
+                </div>
               </Card>
             </Col>
           );
@@ -156,7 +250,7 @@ export default function Devices() {
       </Row>
 
       {/* Filters */}
-      <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
+      <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
         <Input
           prefix={<SearchOutlined style={{ color: '#4a6080' }} />}
           placeholder="搜索设备名称、ID、位置..."
@@ -176,8 +270,13 @@ export default function Devices() {
             <Option key={s} value={s}>{s}</Option>
           ))}
         </Select>
-        <Button icon={<ReloadOutlined />} style={{ background: '#111827', border: '1px solid rgba(0,212,255,0.2)', color: '#00d4ff' }}>
-          刷新
+        <Button
+          icon={<ReloadOutlined spin={refreshing} />}
+          style={{ background: '#111827', border: '1px solid rgba(0,212,255,0.2)', color: '#00d4ff' }}
+          onClick={handleRefresh}
+          loading={refreshing}
+        >
+          刷新数据
         </Button>
       </div>
 
@@ -187,6 +286,10 @@ export default function Devices() {
         rowKey="id"
         pagination={{ pageSize: 8, showTotal: (t) => `共 ${t} 条` }}
         style={{ background: 'transparent' }}
+        onRow={(record) => ({
+          style: { cursor: 'pointer' },
+          onDoubleClick: () => setSelectedDevice(record),
+        })}
       />
 
       {/* Detail Drawer */}
@@ -194,12 +297,15 @@ export default function Devices() {
         title={<span style={{ color: '#00d4ff' }}>{selectedDevice?.name} · 设备详情</span>}
         open={!!selectedDevice}
         onClose={() => setSelectedDevice(null)}
-        width={400}
-        styles={{ body: { background: '#0d1526' }, header: { background: '#0d1526', borderBottom: '1px solid rgba(0,212,255,0.15)' } }}
+        width={420}
+        styles={{
+          body: { background: '#0d1526' },
+          header: { background: '#0d1526', borderBottom: '1px solid rgba(0,212,255,0.15)' },
+        }}
       >
         {selectedDevice && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-            <Card style={{ background: '#111827', border: '1px solid rgba(0,212,255,0.15)' }} bodyStyle={{ padding: 16 }}>
+            <Card style={{ background: '#111827', border: '1px solid rgba(0,212,255,0.15)' }} styles={{ body: { padding: 16 } }}>
               <Row gutter={[16, 12]}>
                 {[
                   { label: '设备ID', value: selectedDevice.id },
@@ -208,6 +314,7 @@ export default function Devices() {
                   { label: '安装位置', value: selectedDevice.location },
                   { label: '装机容量', value: `${selectedDevice.capacity} MW` },
                   { label: '当前功率', value: `${selectedDevice.currentPower} MW` },
+                  { label: '利用率', value: `${selectedDevice.capacity > 0 ? Math.round(selectedDevice.currentPower / selectedDevice.capacity * 100) : 0}%` },
                   { label: '最后更新', value: selectedDevice.lastUpdate },
                 ].map(item => (
                   <Col span={24} key={item.label}>
@@ -233,17 +340,55 @@ export default function Devices() {
             <Card
               title={<span style={{ color: '#00d4ff', fontSize: 13 }}>功率利用率</span>}
               style={{ background: '#111827', border: '1px solid rgba(0,212,255,0.15)' }}
-              headStyle={{ background: 'transparent', borderBottom: '1px solid rgba(0,212,255,0.1)' }}
-              bodyStyle={{ padding: 16 }}
+              styles={{
+                header: { background: 'transparent', borderBottom: '1px solid rgba(0,212,255,0.1)' },
+                body: { padding: 16, display: 'flex', justifyContent: 'center' },
+              }}
             >
               <Progress
                 type="circle"
-                percent={selectedDevice.capacity > 0 ? Math.round((selectedDevice.currentPower / selectedDevice.capacity) * 100) : 0}
+                percent={selectedDevice.capacity > 0
+                  ? Math.round((selectedDevice.currentPower / selectedDevice.capacity) * 100)
+                  : 0
+                }
                 strokeColor="#00d4ff"
                 trailColor="#1a2540"
                 format={p => <span style={{ color: '#00d4ff' }}>{p}%</span>}
               />
             </Card>
+
+            <div style={{ display: 'flex', gap: 8 }}>
+              <Button
+                block
+                style={{
+                  background: selectedDevice.status === '在线' ? 'rgba(255,77,77,0.1)' : 'rgba(0,255,136,0.1)',
+                  border: `1px solid ${selectedDevice.status === '在线' ? '#ff4d4d' : '#00ff88'}`,
+                  color: selectedDevice.status === '在线' ? '#ff4d4d' : '#00ff88',
+                }}
+                icon={selectedDevice.status === '在线' ? <PauseCircleOutlined /> : <PlayCircleOutlined />}
+                onClick={() => {
+                  handleToggle(selectedDevice);
+                  setSelectedDevice(null);
+                }}
+              >
+                {selectedDevice.status === '在线' ? '停止设备' : '启动设备'}
+              </Button>
+              <Button
+                block
+                style={{
+                  background: 'rgba(255,184,0,0.1)',
+                  border: '1px solid #ffb800',
+                  color: '#ffb800',
+                }}
+                icon={<SyncOutlined />}
+                onClick={() => {
+                  handleRestart(selectedDevice);
+                  setSelectedDevice(null);
+                }}
+              >
+                重启设备
+              </Button>
+            </div>
           </div>
         )}
       </Drawer>
