@@ -23,6 +23,7 @@ const typeColors: Record<string, string> = {
   '风电': '#00ff88',
   '充电桩': '#a78bfa',
   '工业负荷': '#fb923c',
+  '电网储能': '#38bdf8',
 };
 
 export default function Devices() {
@@ -227,21 +228,22 @@ export default function Devices() {
 
       {/* Summary Cards */}
       <Row gutter={[16, 16]} style={{ marginBottom: 20 }}>
-        {Object.entries({ '光伏电站': '☀️', '储能系统': '🔋', '风电': '💨', '充电桩': '🚗', '工业负荷': '🏭' }).map(([type, icon]) => {
+        {Object.entries({ '光伏电站': '☀️', '储能系统': '🔋', '电网储能': '🏗️', '风电': '💨', '充电桩': '🚗', '工业负荷': '🏭' }).map(([type, icon]) => {
           const typeDevices = devices.filter(d => d.type === type);
           const online = typeDevices.filter(d => d.status === '在线').length;
           const totalPower = typeDevices.reduce((a, d) => a + d.currentPower, 0);
+          const totalCapacity = typeDevices.reduce((a, d) => a + d.capacity, 0);
           return (
-            <Col key={type} flex="1">
+            <Col key={type} flex="1" style={{ minWidth: 130 }}>
               <Card
                 style={{ background: '#111827', border: `1px solid ${typeColors[type]}30`, borderRadius: 10 }}
                 styles={{ body: { padding: '12px 16px' } }}
               >
-                <div style={{ fontSize: 20, marginBottom: 4 }}>{icon}</div>
-                <div style={{ color: typeColors[type], fontWeight: 600, fontSize: 13 }}>{type}</div>
-                <div style={{ color: '#aab4c8', fontSize: 12 }}>{online}/{typeDevices.length} 在线</div>
+                <div style={{ fontSize: 18, marginBottom: 4 }}>{icon}</div>
+                <div style={{ color: typeColors[type], fontWeight: 600, fontSize: 12 }}>{type}</div>
+                <div style={{ color: '#aab4c8', fontSize: 11 }}>{online}/{typeDevices.length} 在线</div>
                 <div style={{ color: '#4a6080', fontSize: 11, marginTop: 2 }}>
-                  {totalPower.toFixed(1)} MW
+                  {totalPower.toFixed(1)}/{totalCapacity} MW
                 </div>
               </Card>
             </Col>
@@ -260,7 +262,7 @@ export default function Devices() {
         />
         <Select value={typeFilter} onChange={setTypeFilter} style={{ width: 140 }}>
           <Option value="all">全部类型</Option>
-          {['光伏电站', '储能系统', '风电', '充电桩', '工业负荷'].map(t => (
+          {['光伏电站', '储能系统', '电网储能', '风电', '充电桩', '工业负荷'].map(t => (
             <Option key={t} value={t}>{t}</Option>
           ))}
         </Select>
@@ -305,6 +307,29 @@ export default function Devices() {
       >
         {selectedDevice && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+            {/* 电网储能专属信息卡 */}
+            {selectedDevice.type === '电网储能' && (
+              <Card
+                style={{ background: 'rgba(56,189,248,0.06)', border: '1px solid rgba(56,189,248,0.3)', borderRadius: 10 }}
+                styles={{ body: { padding: 14 } }}
+              >
+                <div style={{ color: '#38bdf8', fontSize: 12, fontWeight: 600, marginBottom: 10, letterSpacing: 0.5 }}>
+                  ⚡ 电网侧独立储能
+                </div>
+                {[
+                  { label: '站点', value: selectedDevice.station },
+                  { label: '申报公司', value: selectedDevice.company },
+                  { label: '项目名称', value: selectedDevice.projectName },
+                  { label: '建设地点', value: selectedDevice.buildLocation },
+                ].filter(i => i.value).map(item => (
+                  <div key={item.label} style={{ marginBottom: 8 }}>
+                    <div style={{ color: '#4a6080', fontSize: 11, marginBottom: 2 }}>{item.label}</div>
+                    <div style={{ color: '#e2e8f0', fontSize: 12, lineHeight: 1.5 }}>{item.value}</div>
+                  </div>
+                ))}
+              </Card>
+            )}
+
             <Card style={{ background: '#111827', border: '1px solid rgba(0,212,255,0.15)' }} styles={{ body: { padding: 16 } }}>
               <Row gutter={[16, 12]}>
                 {[
@@ -312,7 +337,8 @@ export default function Devices() {
                   { label: '设备类型', value: selectedDevice.type },
                   { label: '运行状态', value: selectedDevice.status },
                   { label: '安装位置', value: selectedDevice.location },
-                  { label: '装机容量', value: `${selectedDevice.capacity} MW` },
+                  { label: '额定功率', value: `${selectedDevice.capacity} MW` },
+                  ...(selectedDevice.energyCapacity ? [{ label: '额定容量', value: `${selectedDevice.energyCapacity} MWh` }] : []),
                   { label: '当前功率', value: `${selectedDevice.currentPower} MW` },
                   { label: '利用率', value: `${selectedDevice.capacity > 0 ? Math.round(selectedDevice.currentPower / selectedDevice.capacity * 100) : 0}%` },
                   { label: '最后更新', value: selectedDevice.lastUpdate },
