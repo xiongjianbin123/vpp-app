@@ -91,6 +91,13 @@ interface InvestmentConfig {
   peakRegUtilization: number;
   capacityLeasePerMW: number;
   spotSpread: number;
+  // 需求响应
+  demandResponseEvents: number;    // 年均响应次数
+  demandResponseDuration: number;  // 单次响应时长(h)
+  demandResponsePrice: number;     // 响应补贴(元/kWh)
+  // 容量费管理
+  capacityFeeRate: number;         // 需量电费单价(元/kW/月)
+  capacityFeeMonths: number;       // 年节省月数
 }
 
 interface YearlyRow {
@@ -182,12 +189,12 @@ function computeAnnualRevenue(cfg: InvestmentConfig, year: number): number {
     rev += cfg.ratedPower * cfg.capacityLeasePerMW;
   }
   if (models.includes('demandResponse')) {
-    // ratedPower(MW) × 1000 → kW, × 响应电量(kWh/kW/年) × 补贴(元/kWh) ÷ 10000 → 万
-    rev += cfg.ratedPower * 1000 * 20 * 0.3 / 10000 * deg; // 年均响应20次×1h×0.3元/kWh补贴
+    // 年收益 = 功率(MW)×1000kW × 单次时长(h) × 次数 × 补贴(元/kWh) ÷ 10000
+    rev += cfg.ratedPower * 1000 * cfg.demandResponseDuration * cfg.demandResponseEvents * cfg.demandResponsePrice / 10000 * deg;
   }
   if (models.includes('capacityFee')) {
-    // ratedPower(MW) × 1000 → kW, × 需量电费(元/kW/月) × 12 ÷ 10000 → 万
-    rev += cfg.ratedPower * 1000 * 40 * 12 / 10000;
+    // 年收益 = 功率(MW)×1000kW × 需量单价(元/kW/月) × 月数 ÷ 10000
+    rev += cfg.ratedPower * 1000 * cfg.capacityFeeRate * cfg.capacityFeeMonths / 10000;
   }
 
   return +rev.toFixed(4);
@@ -369,6 +376,11 @@ const DEFAULT_CONFIG: InvestmentConfig = {
   peakRegUtilization: 80,
   capacityLeasePerMW: 15,
   spotSpread: 0.5,
+  demandResponseEvents: 20,
+  demandResponseDuration: 2,
+  demandResponsePrice: 0.3,
+  capacityFeeRate: 40,
+  capacityFeeMonths: 12,
 };
 
 // ─── 主组件 ───────────────────────────────────────────────────────────────────
@@ -765,103 +777,204 @@ export default function InvestmentCalculator() {
     const availModels = cfg.storageType === 'commercial' ? COMMERCIAL_MODELS : GRID_MODELS;
     const selectedModelLabels = availModels.filter(m => cfg.selectedModels.includes(m.value)).map(m => m.label);
 
+    // 各模式颜色
+    const modelColors: Record<string, string> = {
+      peakValley: '#00d4ff', spotArbitrage: '#38bdf8',
+      frequency: '#00ff88', peakReg: '#a78bfa',
+      capacityLease: '#ffb800', demandResponse: '#fb923c',
+      capacityFee: '#f472b6',
+    };
+
+    // 逐年分模式收益拆解
+    const breakdownData = Array.from({ length: cfg.calcPeriod }, (_, i) => {
+      const year = i + 1;
+      const deg = Math.pow(1 - cfg.annualDegradation / 100, year - 1);
+      const eff = cfg.chargeDischargeEfficiency / 100;
+      const row: Record<string, number | string> = { year: `第${year}年` };
+      if (cfg.selectedModels.includes('peakValley'))
+        row.peakValley = +(cfg.ratedCapacity * 1000 * eff * cfg.peakValleySpread * cfg.dailyCycles * 365 / 10000 * deg).toFixed(2);
+      if (cfg.selectedModels.includes('spotArbitrage'))
+        row.spotArbitrage = +(cfg.ratedCapacity * 1000 * eff * cfg.spotSpread * cfg.dailyCycles * 365 / 10000 * deg).toFixed(2);
+      if (cfg.selectedModels.includes('frequency'))
+        row.frequency = +(cfg.ratedPower * cfg.frequencyMileage * cfg.frequencyMileagePrice * cfg.kValue * 365 / 10000 * deg).toFixed(2);
+      if (cfg.selectedModels.includes('peakReg'))
+        row.peakReg = +(cfg.ratedPower * cfg.peakRegPrice * cfg.peakRegHours * (cfg.peakRegUtilization / 100) / 10000 * deg).toFixed(2);
+      if (cfg.selectedModels.includes('capacityLease'))
+        row.capacityLease = +(cfg.ratedPower * cfg.capacityLeasePerMW).toFixed(2);
+      if (cfg.selectedModels.includes('demandResponse'))
+        row.demandResponse = +(cfg.ratedPower * 1000 * cfg.demandResponseDuration * cfg.demandResponseEvents * cfg.demandResponsePrice / 10000 * deg).toFixed(2);
+      if (cfg.selectedModels.includes('capacityFee'))
+        row.capacityFee = +(cfg.ratedPower * 1000 * cfg.capacityFeeRate * cfg.capacityFeeMonths / 10000).toFixed(2);
+      return row;
+    });
+
+    // 首年各模式收益（用于饼图）
+    const year1 = breakdownData[0] ?? {};
+    const pieData = cfg.selectedModels
+      .filter(m => typeof year1[m] === 'number')
+      .map(m => ({
+        name: availModels.find(x => x.value === m)?.label ?? m,
+        value: year1[m] as number,
+        color: modelColors[m] ?? '#aab4c8',
+      }));
+
     const yearlyColumns: ColumnType<YearlyRow>[] = [
-      { title: '年份', dataIndex: 'year', width: 70, fixed: 'left' },
+      { title: '年份', dataIndex: 'year', width: 64, fixed: 'left' },
       { title: '年收益(万)', dataIndex: 'revenue', render: (v: number) => <span style={{ color: '#00ff88' }}>{v.toFixed(2)}</span> },
-      { title: '运维成本(万)', dataIndex: 'opex', render: (v: number) => <span style={{ color: '#ffb800' }}>{v.toFixed(2)}</span> },
-      { title: '还贷(万)', dataIndex: 'debtService', render: (v: number) => <span style={{ color: '#ff4d4d' }}>{v.toFixed(2)}</span> },
+      { title: '运维+还贷(万)', dataIndex: 'key', render: (_: unknown, r: YearlyRow) => <span style={{ color: '#ffb800' }}>{(r.opex + r.debtService).toFixed(2)}</span> },
       { title: '净现金流(万)', dataIndex: 'netCashFlow', render: (v: number) => <span style={{ color: v >= 0 ? '#00d4ff' : '#ff4d4d', fontWeight: 600 }}>{v.toFixed(2)}</span> },
-      { title: '累计净现金流(万)', dataIndex: 'cumulativeCF', render: (v: number) => <span style={{ color: v >= 0 ? '#00ff88' : '#ff4d4d' }}>{v.toFixed(2)}</span> },
+      { title: '累计净CF(万)', dataIndex: 'cumulativeCF', render: (v: number) => <span style={{ color: v >= 0 ? '#00ff88' : '#ff4d4d' }}>{v.toFixed(2)}</span> },
     ];
+
+    // 输入参数分组
+    const paramGroups: { label: string; model: string; fields: { label: string; key: keyof InvestmentConfig; step?: number; min?: number; max?: number }[] }[] = [];
+    if (cfg.selectedModels.includes('peakValley'))
+      paramGroups.push({ label: '峰谷套利', model: 'peakValley', fields: [
+        { label: '峰谷价差（元/kWh）', key: 'peakValleySpread', step: 0.05, min: 0 },
+      ]});
+    if (cfg.selectedModels.includes('spotArbitrage'))
+      paramGroups.push({ label: '现货套利', model: 'spotArbitrage', fields: [
+        { label: '现货价差（元/kWh）', key: 'spotSpread', step: 0.05, min: 0 },
+      ]});
+    if (cfg.selectedModels.includes('frequency'))
+      paramGroups.push({ label: '调频辅助服务', model: 'frequency', fields: [
+        { label: '调频里程（MWh/MW/天）', key: 'frequencyMileage', step: 1, min: 0 },
+        { label: '里程单价（元/MWh）', key: 'frequencyMileagePrice', step: 0.001, min: 0 },
+        { label: 'K 值', key: 'kValue', step: 0.05, min: 0, max: 2 },
+      ]});
+    if (cfg.selectedModels.includes('peakReg'))
+      paramGroups.push({ label: '调峰辅助服务', model: 'peakReg', fields: [
+        { label: '调峰单价（元/MW·h）', key: 'peakRegPrice', step: 5, min: 0 },
+        { label: '年调峰小时数', key: 'peakRegHours', step: 100, min: 0 },
+        { label: '容量利用率（%）', key: 'peakRegUtilization', step: 5, min: 0, max: 100 },
+      ]});
+    if (cfg.selectedModels.includes('capacityLease'))
+      paramGroups.push({ label: '容量租赁', model: 'capacityLease', fields: [
+        { label: '容量租金（万/MW/年）', key: 'capacityLeasePerMW', step: 1, min: 0 },
+      ]});
+    if (cfg.selectedModels.includes('demandResponse'))
+      paramGroups.push({ label: '需求响应', model: 'demandResponse', fields: [
+        { label: '年均响应次数（次/年）', key: 'demandResponseEvents', step: 1, min: 0 },
+        { label: '单次响应时长（h）', key: 'demandResponseDuration', step: 0.5, min: 0 },
+        { label: '响应补贴单价（元/kWh）', key: 'demandResponsePrice', step: 0.05, min: 0 },
+      ]});
+    if (cfg.selectedModels.includes('capacityFee'))
+      paramGroups.push({ label: '容量费管理', model: 'capacityFee', fields: [
+        { label: '需量电费单价（元/kW/月）', key: 'capacityFeeRate', step: 5, min: 0 },
+        { label: '年节省月数（月）', key: 'capacityFeeMonths', step: 1, min: 1, max: 12 },
+      ]});
 
     return (
       <Row gutter={[16, 16]}>
+        {/* 参数配置区 */}
         <Col span={24}>
           <Card style={cardStyle} styles={{ header: headStyle }}
             title={
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ color: '#00d4ff' }}>收益测算参数</span>
+                <span style={{ color: '#00d4ff' }}>各模式收益参数配置</span>
                 <div style={{ display: 'flex', gap: 6 }}>
-                  {selectedModelLabels.map(l => <Tag key={l} color="blue">{l}</Tag>)}
+                  {selectedModelLabels.map((l, i) => (
+                    <Tag key={l} style={{ background: `${Object.values(modelColors)[i % 7]}18`, border: `1px solid ${Object.values(modelColors)[i % 7]}55`, color: Object.values(modelColors)[i % 7] }}>{l}</Tag>
+                  ))}
                 </div>
               </div>
             }
           >
-            <Row gutter={[16, 8]} style={{ marginTop: 8 }}>
-              {cfg.selectedModels.includes('peakValley') && (
-                <Col span={6}>
-                  <span style={labelStyle}>峰谷价差（元/kWh）</span>
-                  <InputNumber value={cfg.peakValleySpread} onChange={v => set('peakValleySpread', v ?? 0)} step={0.05} min={0} style={{ ...inputStyle, width: '100%', marginTop: 4 }} />
+            <Row gutter={[16, 12]} style={{ marginTop: 8 }}>
+              {paramGroups.map(group => (
+                <Col key={group.model} span={Math.max(6, Math.min(8, Math.round(24 / paramGroups.length)))}>
+                  <div style={{
+                    background: '#0a0e1a',
+                    border: `1px solid ${modelColors[group.model] ?? '#00d4ff'}30`,
+                    borderRadius: 8,
+                    padding: '10px 12px',
+                  }}>
+                    <div style={{ color: modelColors[group.model] ?? '#00d4ff', fontSize: 12, fontWeight: 600, marginBottom: 10, borderBottom: `1px solid ${modelColors[group.model] ?? '#00d4ff'}20`, paddingBottom: 6 }}>
+                      {group.label}
+                    </div>
+                    {group.fields.map(f => (
+                      <div key={f.key} style={{ marginBottom: 8 }}>
+                        <div style={{ ...labelStyle, fontSize: 11, marginBottom: 3 }}>{f.label}</div>
+                        <InputNumber
+                          value={cfg[f.key] as number}
+                          onChange={v => set(f.key, (v ?? 0) as InvestmentConfig[typeof f.key])}
+                          step={f.step ?? 1}
+                          min={f.min ?? 0}
+                          max={f.max}
+                          style={{ ...inputStyle, width: '100%' }}
+                          size="small"
+                        />
+                      </div>
+                    ))}
+                    <div style={{ color: '#4a6080', fontSize: 11, marginTop: 6, borderTop: `1px solid rgba(255,255,255,0.04)`, paddingTop: 6 }}>
+                      首年收益：<span style={{ color: modelColors[group.model] ?? '#00d4ff', fontWeight: 600 }}>
+                        ¥{typeof year1[group.model] === 'number' ? (year1[group.model] as number).toFixed(2) : '0.00'} 万
+                      </span>
+                    </div>
+                  </div>
                 </Col>
-              )}
-              {cfg.selectedModels.includes('frequency') && <>
-                <Col span={6}>
-                  <span style={labelStyle}>调频里程（MWh/MW/天）</span>
-                  <InputNumber value={cfg.frequencyMileage} onChange={v => set('frequencyMileage', v ?? 0)} step={1} min={0} style={{ ...inputStyle, width: '100%', marginTop: 4 }} />
-                </Col>
-                <Col span={6}>
-                  <span style={labelStyle}>里程单价（元/MWh）</span>
-                  <InputNumber value={cfg.frequencyMileagePrice} onChange={v => set('frequencyMileagePrice', v ?? 0)} step={0.001} min={0} style={{ ...inputStyle, width: '100%', marginTop: 4 }} />
-                </Col>
-                <Col span={6}>
-                  <span style={labelStyle}>K值</span>
-                  <InputNumber value={cfg.kValue} onChange={v => set('kValue', v ?? 1)} step={0.05} min={0} max={2} style={{ ...inputStyle, width: '100%', marginTop: 4 }} />
-                </Col>
-              </>}
-              {cfg.selectedModels.includes('peakReg') && <>
-                <Col span={6}>
-                  <span style={labelStyle}>调峰单价（元/MW·h）</span>
-                  <InputNumber value={cfg.peakRegPrice} onChange={v => set('peakRegPrice', v ?? 0)} step={5} min={0} style={{ ...inputStyle, width: '100%', marginTop: 4 }} />
-                </Col>
-                <Col span={6}>
-                  <span style={labelStyle}>年调峰小时数</span>
-                  <InputNumber value={cfg.peakRegHours} onChange={v => set('peakRegHours', v ?? 0)} step={100} min={0} style={{ ...inputStyle, width: '100%', marginTop: 4 }} />
-                </Col>
-                <Col span={6}>
-                  <span style={labelStyle}>容量利用率（%）</span>
-                  <InputNumber value={cfg.peakRegUtilization} onChange={v => set('peakRegUtilization', v ?? 0)} step={5} min={0} max={100} style={{ ...inputStyle, width: '100%', marginTop: 4 }} />
-                </Col>
-              </>}
-              {cfg.selectedModels.includes('capacityLease') && (
-                <Col span={6}>
-                  <span style={labelStyle}>容量租金（万/MW/年）</span>
-                  <InputNumber value={cfg.capacityLeasePerMW} onChange={v => set('capacityLeasePerMW', v ?? 0)} step={1} min={0} style={{ ...inputStyle, width: '100%', marginTop: 4 }} />
-                </Col>
-              )}
-              {cfg.selectedModels.includes('spotArbitrage') && (
-                <Col span={6}>
-                  <span style={labelStyle}>现货价差（元/kWh）</span>
-                  <InputNumber value={cfg.spotSpread} onChange={v => set('spotSpread', v ?? 0)} step={0.05} min={0} style={{ ...inputStyle, width: '100%', marginTop: 4 }} />
-                </Col>
-              )}
+              ))}
             </Row>
           </Card>
         </Col>
-        <Col span={12}>
-          <Card style={cardStyle} styles={{ header: headStyle }} title={<span style={{ color: '#00d4ff' }}>逐年收益明细</span>}>
+
+        {/* 首年收益构成饼图 */}
+        <Col span={8}>
+          <Card style={cardStyle} styles={{ header: headStyle }} title={<span style={{ color: '#00d4ff' }}>首年收益构成</span>}>
+            <ResponsiveContainer width="100%" height={220}>
+              <PieChart>
+                <Pie data={pieData} cx="50%" cy="50%" innerRadius={45} outerRadius={80} dataKey="value"
+                  label={({ name, percent }: { name?: string; percent?: number }) => `${name ?? ''} ${((percent ?? 0) * 100).toFixed(0)}%`}
+                  labelLine={{ stroke: '#4a6080' }}>
+                  {pieData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+                </Pie>
+                <RTooltip contentStyle={tooltipStyle} formatter={(v: unknown) => [`¥${Number(v).toFixed(2)}万`, '']} />
+              </PieChart>
+            </ResponsiveContainer>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 4 }}>
+              {pieData.map(d => (
+                <div key={d.name} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
+                  <span style={{ color: d.color }}>● {d.name}</span>
+                  <span style={{ color: '#e2e8f0' }}>¥{d.value.toFixed(2)} 万</span>
+                </div>
+              ))}
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 4, marginTop: 2 }}>
+                <span style={{ color: '#6b7280' }}>合计</span>
+                <span style={{ color: '#00ff88', fontWeight: 600 }}>¥{pieData.reduce((s, d) => s + d.value, 0).toFixed(2)} 万</span>
+              </div>
+            </div>
+          </Card>
+        </Col>
+
+        {/* 分模式逐年收益堆叠图 */}
+        <Col span={16}>
+          <Card style={cardStyle} styles={{ header: headStyle }} title={<span style={{ color: '#00d4ff' }}>各模式逐年收益拆解（堆叠）</span>}>
+            <ResponsiveContainer width="100%" height={260}>
+              <BarChart data={breakdownData} margin={{ top: 10, right: 16, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                <XAxis dataKey="year" stroke="#4a6080" tick={{ fontSize: 9 }} interval={Math.floor(cfg.calcPeriod / 6)} />
+                <YAxis stroke="#4a6080" tick={{ fontSize: 11 }} unit="万" />
+                <RTooltip contentStyle={tooltipStyle} formatter={(v: unknown) => [`¥${Number(v).toFixed(2)}万`, '']} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                {cfg.selectedModels.map(m => (
+                  <Bar key={m} dataKey={m} name={availModels.find(x => x.value === m)?.label ?? m}
+                    stackId="rev" fill={modelColors[m] ?? '#aab4c8'} />
+                ))}
+              </BarChart>
+            </ResponsiveContainer>
+          </Card>
+        </Col>
+
+        {/* 逐年明细表 */}
+        <Col span={24}>
+          <Card style={cardStyle} styles={{ header: headStyle }} title={<span style={{ color: '#00d4ff' }}>逐年现金流明细</span>}>
             <Table
               dataSource={results.yearlyRows}
               columns={yearlyColumns}
               size="small"
               pagination={false}
-              scroll={{ y: 300 }}
+              scroll={{ x: 'max-content', y: 260 }}
             />
-          </Card>
-        </Col>
-        <Col span={12}>
-          <Card style={cardStyle} styles={{ header: headStyle }} title={<span style={{ color: '#00d4ff' }}>累计现金流曲线</span>}>
-            <ResponsiveContainer width="100%" height={320}>
-              <LineChart data={results.yearlyRows} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                <XAxis dataKey="year" stroke="#4a6080" tick={{ fontSize: 10 }} interval={Math.floor(cfg.calcPeriod / 5)} />
-                <YAxis stroke="#4a6080" tick={{ fontSize: 11 }} unit="万" />
-                <RTooltip contentStyle={tooltipStyle} formatter={(v: unknown) => [`¥${Number(v).toFixed(1)}万`, '']} />
-                <ReferenceLine y={0} stroke="#ffb800" strokeDasharray="4 4" label={{ value: '回收期', fill: '#ffb800', fontSize: 11 }} />
-                <Legend />
-                <Line type="monotone" dataKey="cumulativeCF" name="累计净现金流" stroke="#00d4ff" strokeWidth={2} dot={false} />
-                <Line type="monotone" dataKey="cumulativeDiscountedCF" name="累计折现现金流" stroke="#00ff88" strokeWidth={2} dot={false} strokeDasharray="5 3" />
-              </LineChart>
-            </ResponsiveContainer>
           </Card>
         </Col>
       </Row>
