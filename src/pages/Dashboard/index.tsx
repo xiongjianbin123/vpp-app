@@ -204,19 +204,20 @@ export default function Dashboard() {
             style={{ background: '#111827', border: '1px solid rgba(0,212,255,0.15)', borderRadius: 12 }}
             styles={{ header: { borderBottom: '1px solid rgba(0,212,255,0.15)', background: 'transparent' } }}
           >
-            <ResponsiveContainer width="100%" height={260}>
+            <ResponsiveContainer width="100%" height={200}>
               <PieChart>
                 <Pie
                   data={energyPie}
                   cx="50%"
-                  cy="45%"
-                  innerRadius={60}
-                  outerRadius={90}
+                  cy="50%"
+                  innerRadius={55}
+                  outerRadius={85}
                   dataKey="value"
-                  label={({ name, percent }: { name?: string; percent?: number }) =>
-                    `${name ?? ''} ${((percent ?? 0) * 100).toFixed(0)}%`
+                  isAnimationActive={false}
+                  label={({ percent }: { percent?: number }) =>
+                    percent && percent > 0.03 ? `${((percent ?? 0) * 100).toFixed(0)}%` : ''
                   }
-                  labelLine={{ stroke: '#4a6080' }}
+                  labelLine={false}
                 >
                   {energyPie.map((_, index) => (
                     <Cell key={index} fill={COLORS[index % COLORS.length]} />
@@ -224,10 +225,29 @@ export default function Dashboard() {
                 </Pie>
                 <Tooltip
                   contentStyle={{ background: '#1a2540', border: '1px solid #00d4ff', borderRadius: 8 }}
-                  formatter={(v) => [`${v} MW`, '']}
+                  formatter={(v: unknown) => [`${v} MW`, '']}
                 />
               </PieChart>
             </ResponsiveContainer>
+            {/* 自定义图例 */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '0 8px 8px' }}>
+              {energyPie.map((item, index) => {
+                const total = energyPie.reduce((s, d) => s + d.value, 0);
+                const pct = total > 0 ? ((item.value / total) * 100).toFixed(1) : '0';
+                return (
+                  <div key={item.name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <div style={{ width: 10, height: 10, borderRadius: 2, background: COLORS[index], flexShrink: 0 }} />
+                      <span style={{ color: '#aab4c8', fontSize: 12 }}>{item.name}</span>
+                    </div>
+                    <div style={{ display: 'flex', gap: 10 }}>
+                      <span style={{ color: COLORS[index], fontSize: 12, fontWeight: 600 }}>{pct}%</span>
+                      <span style={{ color: '#4a6080', fontSize: 11 }}>{item.value} MW</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </Card>
         </Col>
 
