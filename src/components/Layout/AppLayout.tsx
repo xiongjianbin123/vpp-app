@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import huitoneLogo from '/Huitone-logo.png';
 import { Layout, Menu, Badge } from 'antd';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
@@ -46,7 +47,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           borderBottom: '1px solid rgba(0, 212, 255, 0.15)',
         }}>
           <img
-            src="/Huitone-logo.png"
+            src={huitoneLogo}
             alt="Huitone Logo"
             style={{
               height: collapsed ? 32 : 40,
