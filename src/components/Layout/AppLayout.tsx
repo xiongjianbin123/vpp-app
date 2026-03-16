@@ -4,7 +4,7 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import {
   DashboardOutlined, ThunderboltOutlined, ApartmentOutlined, DollarOutlined,
   BellOutlined, UserOutlined, LogoutOutlined, SettingOutlined, IdcardOutlined,
-  CheckCircleOutlined, WarningOutlined, InfoCircleOutlined,
+  CheckCircleOutlined, WarningOutlined, InfoCircleOutlined, LineChartOutlined,
 } from '@ant-design/icons';
 import huitoneLogo from '/Huitone-logo.png';
 
@@ -14,6 +14,7 @@ const menuItems = [
   { key: '/', icon: <DashboardOutlined />, label: '监控大屏' },
   { key: '/devices', icon: <ApartmentOutlined />, label: '设备资产' },
   { key: '/demand-response', icon: <ThunderboltOutlined />, label: '需求响应' },
+  { key: '/spot-market', icon: <LineChartOutlined />, label: '现货交易' },
   { key: '/revenue', icon: <DollarOutlined />, label: '收益结算' },
 ];
 
@@ -21,6 +22,7 @@ const pageNames: Record<string, string> = {
   '/': '实时监控大屏',
   '/devices': '设备资产管理',
   '/demand-response': '需求响应管理',
+  '/spot-market': '现货市场交易策略',
   '/revenue': '收益结算',
 };
 

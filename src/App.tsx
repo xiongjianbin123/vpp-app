@@ -6,6 +6,7 @@ import Dashboard from './pages/Dashboard';
 import Devices from './pages/Devices';
 import DemandResponse from './pages/DemandResponse';
 import Revenue from './pages/Revenue';
+import SpotMarket from './pages/SpotMarket';
 
 const darkTheme = {
   algorithm: theme.darkAlgorithm,
@@ -47,6 +48,7 @@ export default function App() {
             <Route path="/devices" element={<Devices />} />
             <Route path="/demand-response" element={<DemandResponse />} />
             <Route path="/revenue" element={<Revenue />} />
+            <Route path="/spot-market" element={<SpotMarket />} />
           </Routes>
         </AppLayout>
       </HashRouter>
