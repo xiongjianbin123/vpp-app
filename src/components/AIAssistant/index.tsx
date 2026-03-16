@@ -1,13 +1,17 @@
 import { useState, useRef, useEffect } from 'react';
-import { Drawer, Input, Button, Tag } from 'antd';
-import { SendOutlined, RobotOutlined, UserOutlined, LoadingOutlined } from '@ant-design/icons';
+import { Drawer, Input, Button, Tag, Tooltip, Alert, Modal } from 'antd';
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, RadialBarChart, RadialBar, Legend,
+  SendOutlined, RobotOutlined, UserOutlined, LoadingOutlined,
+  SettingOutlined, KeyOutlined, CheckCircleOutlined, ApiOutlined,
+} from '@ant-design/icons';
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip,
+  ResponsiveContainer, PieChart, Pie, Cell, Legend,
 } from 'recharts';
-import { mockDevices } from '../../mock/data';
+import Anthropic from '@anthropic-ai/sdk';
+import { mockDevices, mockTasks } from '../../mock/data';
 
-// ─── 问题建议清单 ───────────────────────────────────────────────
+// ─── 常见问题 ─────────────────────────────────────────────────────
 export const SUGGESTED_QUESTIONS = [
   '当前各储能站点的SOC状态如何？',
   '电网储能项目整体运行情况？',
@@ -21,11 +25,10 @@ export const SUGGESTED_QUESTIONS = [
   '当前系统整体运行状态？',
 ];
 
-// ─── 消息类型定义 ────────────────────────────────────────────────
+// ─── 类型 ─────────────────────────────────────────────────────────
 type ChartBlock =
   | { kind: 'bar'; data: object[]; bars: { key: string; color: string }[]; unit?: string }
   | { kind: 'pie'; data: { name: string; value: number; color: string }[] }
-  | { kind: 'radial'; data: { name: string; value: number; fill: string }[] }
   | { kind: 'kpi'; items: { label: string; value: string; color: string; sub?: string }[] }
   | { kind: 'table'; head: string[]; rows: (string | number)[][] };
 
@@ -34,394 +37,334 @@ interface AIMessage {
   role: 'user' | 'assistant';
   text: string;
   charts?: ChartBlock[];
+  streaming?: boolean;
+  source?: 'ai' | 'mock';
   ts: Date;
 }
 
-// ─── 响应引擎 ────────────────────────────────────────────────────
-const storageDevices = mockDevices.filter(d => d.type === '储能系统' || d.type === '电网储能');
+// ─── VPP 系统提示词 ───────────────────────────────────────────────
+function buildSystemPrompt(): string {
+  const onlineDevices = mockDevices.filter(d => d.status === '在线');
+  const alertDevices = mockDevices.filter(d => d.status === '告警');
+  const gridStorage = mockDevices.filter(d => d.type === '电网储能');
+  const storageWithSoc = mockDevices.filter(d => d.soc !== undefined);
+
+  const deviceSummary = mockDevices.map(d =>
+    `  - ${d.id} ${d.name}（${d.type}）状态:${d.status} 容量:${d.capacity}MW 当前功率:${d.currentPower}MW${d.soc !== undefined ? ` SOC:${d.soc}%` : ''} 位置:${d.location}`
+  ).join('\n');
+
+  const gridStorageSummary = gridStorage.map(d =>
+    `  - ${d.station}（${d.id}）：${d.capacity}MW/${d.energyCapacity}MWh SOC:${d.soc}% 当前:${d.currentPower}MW 公司:${d.company}`
+  ).join('\n');
+
+  const taskSummary = mockTasks.map(t =>
+    `  - ${t.id} ${t.name} 类型:${t.type} 状态:${t.status} 目标:${t.targetPower}MW 进度:${t.progress}% 收益:¥${(t.reward / 10000).toFixed(1)}万`
+  ).join('\n');
+
+  return `你是广州汇图能源科技（Huitone）虚拟电厂（VPP）平台的智能运营助手。
+你帮助运营人员通过自然语言查询平台数据、分析运行状态、辅助调度决策。
+
+## 平台实时数据（当前时刻）
+
+### 设备总览
+- 总设备数：${mockDevices.length} 台，在线：${onlineDevices.length} 台，告警：${alertDevices.length} 台
+- 总装机容量：${mockDevices.reduce((a, d) => a + d.capacity, 0)} MW
+- 当前总出力：${onlineDevices.reduce((a, d) => a + d.currentPower, 0).toFixed(1)} MW
+
+### 各设备状态
+${deviceSummary}
+
+### 电网侧独立储能项目（${gridStorage.length} 个，全部在线）
+${gridStorageSummary}
+- 总规模：${gridStorage.reduce((a, d) => a + d.capacity, 0)} MW / ${gridStorage.reduce((a, d) => a + (d.energyCapacity ?? 0), 0)} MWh
+- 当前总放电：${gridStorage.reduce((a, d) => a + d.currentPower, 0).toFixed(1)} MW
+- 平均SOC：${Math.round(storageWithSoc.reduce((a, d) => a + (d.soc ?? 0), 0) / storageWithSoc.length)}%
+
+### 需求响应任务
+${taskSummary}
+
+### 收益数据
+- 年度累计收益：¥387.2万
+- 本月收益：¥249万（调峰¥135万 / 调频¥72万 / 辅助服务¥42万）
+- 已结算：¥41.1万，结算中：¥10.8万，待结算：¥6.3万
+
+### 电网参数
+- 当前频率：50.03 Hz（正常范围 50±0.2Hz）
+- 母线电压：220.8 V
+
+## 回答规范
+- 使用**简体中文**回答，专业简洁
+- 关键数字用 **加粗** 标注
+- 使用项目符号列表组织信息
+- 数值单位要标注（MW、MWh、%、万元等）
+- 如有异常情况，给出简短处置建议
+- 不要编造平台数据之外的信息`;
+}
+
+// ─── Mock 响应引擎（快捷问题用） ──────────────────────────────────
 const gridStorage = mockDevices.filter(d => d.type === '电网储能');
+const storageDevices = mockDevices.filter(d => d.type === '储能系统' || d.type === '电网储能');
 const onlineDevices = mockDevices.filter(d => d.status === '在线');
 const alertDevices = mockDevices.filter(d => d.status === '告警');
-const offlineDevices = mockDevices.filter(d => d.status === '离线' || d.status === '维护');
+const offlineDevices = mockDevices.filter(d => d.status !== '在线');
 
-function buildResponse(q: string): { text: string; charts?: ChartBlock[] } {
+function buildMockResponse(q: string): { text: string; charts?: ChartBlock[] } {
   const lq = q.toLowerCase();
 
-  // SOC / 荷电 / 储能状态
-  if (/soc|荷电|充电|电量|储能状态/.test(lq)) {
-    const socData = storageDevices
-      .filter(d => d.soc !== undefined)
-      .map(d => ({
-        name: d.station ?? d.name,
-        SOC: d.soc!,
-        fill: d.soc! > 70 ? '#00ff88' : d.soc! > 40 ? '#00d4ff' : '#ffb800',
-      }));
-    const avgSoc = Math.round(socData.reduce((a, b) => a + b.SOC, 0) / socData.length);
+  if (/soc|荷电|储能状态/.test(lq)) {
+    const socData = storageDevices.filter(d => d.soc !== undefined).map(d => ({
+      name: d.station ?? d.name, SOC: d.soc!,
+    }));
+    const avg = Math.round(socData.reduce((a, b) => a + b.SOC, 0) / socData.length);
     return {
-      text: `当前共 **${storageDevices.length}** 个储能站点在线，平均 SOC 为 **${avgSoc}%**。\n\n` +
-        socData.map(d => `• ${d.name}：${d.SOC}%${d.SOC < 40 ? '（⚠️ 偏低，建议安排充电）' : d.SOC > 80 ? '（电量充足）' : ''}`).join('\n'),
+      text: `当前共 **${storageDevices.length}** 个储能站点在线，平均 SOC **${avg}%**。\n\n` +
+        socData.map(d => `• ${d.name}：**${d.SOC}%**${d.SOC < 40 ? '（⚠️ 偏低，建议充电）' : d.SOC > 80 ? '（电量充足）' : ''}`).join('\n'),
+      charts: [{ kind: 'bar', data: socData, bars: [{ key: 'SOC', color: '#00d4ff' }], unit: '%' }],
+    };
+  }
+
+  if (/电网储能|独立储能|各站/.test(lq)) {
+    const cap = gridStorage.reduce((a, d) => a + d.capacity, 0);
+    const ene = gridStorage.reduce((a, d) => a + (d.energyCapacity ?? 0), 0);
+    const pwr = gridStorage.reduce((a, d) => a + d.currentPower, 0);
+    return {
+      text: `电网侧独立储能 **${gridStorage.length}** 个项目，全部**在线运营**。\n\n• 总功率：**${cap} MW** / 总容量：**${ene} MWh**\n• 当前放电：**${pwr.toFixed(1)} MW**（利用率 ${Math.round(pwr / cap * 100)}%）`,
       charts: [{
-        kind: 'bar',
-        data: socData.map(d => ({ name: d.name, SOC: d.SOC })),
-        bars: [{ key: 'SOC', color: '#00d4ff' }],
-        unit: '%',
+        kind: 'table',
+        head: ['站点', '规模', '当前功率', 'SOC', '公司'],
+        rows: gridStorage.map(d => [d.station ?? d.name, `${d.capacity}MW/${d.energyCapacity}MWh`, `${d.currentPower}MW`, `${d.soc}%`, d.company?.replace(/有限公司|有限$/, '') ?? '-']),
       }],
     };
   }
 
-  // 电网储能 / 独立储能 / 各站点
-  if (/电网储能|独立储能|电网侧|站点运行|各站/.test(lq)) {
-    const totalCapacity = gridStorage.reduce((a, d) => a + d.capacity, 0);
-    const totalEnergy = gridStorage.reduce((a, d) => a + (d.energyCapacity ?? 0), 0);
-    const totalPower = gridStorage.reduce((a, d) => a + d.currentPower, 0);
+  if (/告警|异常|故障/.test(lq)) {
     return {
-      text: `电网侧独立储能共 **${gridStorage.length}** 个项目，全部处于**在线运营**状态。\n\n` +
-        `• 总额定功率：**${totalCapacity} MW**\n` +
-        `• 总储能容量：**${totalEnergy} MWh**\n` +
-        `• 当前总放电功率：**${totalPower.toFixed(1)} MW**\n` +
-        `• 综合利用率：**${Math.round(totalPower / totalCapacity * 100)}%**`,
-      charts: [
-        {
-          kind: 'table',
-          head: ['站点', '规模', '当前功率', 'SOC', '公司'],
-          rows: gridStorage.map(d => [
-            d.station ?? d.name,
-            `${d.capacity}MW/${d.energyCapacity}MWh`,
-            `${d.currentPower}MW`,
-            `${d.soc}%`,
-            d.company?.replace('有限公司', '').replace('有限', '') ?? '-',
-          ]),
-        },
-      ],
-    };
-  }
-
-  // 告警 / 异常 / 故障
-  if (/告警|异常|故障|报警|问题/.test(lq)) {
-    if (alertDevices.length === 0) {
-      return { text: '当前系统无告警，所有设备运行正常。' };
-    }
-    return {
-      text: `当前有 **${alertDevices.length}** 台设备处于告警状态，请及时处理：\n\n` +
-        alertDevices.map(d => `• **${d.name}**（${d.location}）—— ${d.type}，已停止出力`).join('\n') +
-        `\n\n建议优先检查通信链路和设备本体状态。`,
+      text: alertDevices.length === 0 ? '当前系统无告警，所有设备运行正常。' :
+        `当前 **${alertDevices.length}** 台设备告警：\n\n` +
+        alertDevices.map(d => `• **${d.name}**（${d.location}）— ${d.type}`).join('\n') +
+        '\n\n建议优先检查通信链路和设备本体状态。',
       charts: [{
-        kind: 'kpi',
-        items: [
-          { label: '告警设备', value: String(alertDevices.length), color: '#ff4d4d', sub: '台' },
-          { label: '离线设备', value: String(offlineDevices.filter(d => d.status === '离线').length), color: '#4a5568', sub: '台' },
-          { label: '维护设备', value: String(offlineDevices.filter(d => d.status === '维护').length), color: '#ffb800', sub: '台' },
-          { label: '正常在线', value: String(onlineDevices.length), color: '#00ff88', sub: '台' },
+        kind: 'kpi', items: [
+          { label: '告警', value: String(alertDevices.length), color: '#ff4d4d', sub: '台' },
+          { label: '离线', value: String(offlineDevices.filter(d => d.status === '离线').length), color: '#4a5568', sub: '台' },
+          { label: '维护', value: String(offlineDevices.filter(d => d.status === '维护').length), color: '#ffb800', sub: '台' },
+          { label: '在线', value: String(onlineDevices.length), color: '#00ff88', sub: '台' },
         ],
       }],
     };
   }
 
-  // 能源结构 / 出力 / 发电分布
-  if (/能源结构|出力|发电分布|能源占比|结构/.test(lq)) {
-    const pieData = [
+  if (/能源结构|出力|发电分布/.test(lq)) {
+    const pie = [
       { name: '光伏', value: 38.5, color: '#ffb800' },
       { name: '储能放电', value: 23.7, color: '#00d4ff' },
       { name: '风电', value: 22.1, color: '#00ff88' },
       { name: '柔性负荷', value: 44.2, color: '#a78bfa' },
     ];
-    const total = pieData.reduce((a, b) => a + b.value, 0);
+    const total = pie.reduce((a, b) => a + b.value, 0);
     return {
-      text: `当前总出力 **${total.toFixed(1)} MW**，各类型能源出力占比如下：\n\n` +
-        pieData.map(d => `• ${d.name}：${d.value} MW（${Math.round(d.value / total * 100)}%）`).join('\n') +
-        `\n\n光伏和柔性负荷为主力出力来源，储能系统辅助调峰，整体运行结构均衡。`,
-      charts: [{ kind: 'pie', data: pieData }],
+      text: `当前总出力 **${total.toFixed(1)} MW**：\n\n` +
+        pie.map(d => `• ${d.name}：**${d.value} MW**（${Math.round(d.value / total * 100)}%）`).join('\n'),
+      charts: [{ kind: 'pie', data: pie }],
     };
   }
 
-  // 调度任务 / 需求响应
-  if (/调度|任务|需求响应|响应任务|执行中/.test(lq)) {
+  if (/调度|任务|需求响应/.test(lq)) {
     return {
-      text: `当前调度任务共 **5** 个，执行中 **1** 个，待响应 **2** 个，已完成 **2** 个。\n\n` +
-        `📌 **执行中任务：** 高峰调峰任务-01（T001），目标 50MW，当前出力 42.3MW，进度 65%，预计收益 ¥12.5万\n\n` +
-        `⏳ **待响应任务：** 频率调节任务-A（14:00-16:00）、应急调频任务-B（16:00-18:00）\n\n` +
-        `✅ 今日已完成任务共计收益：**¥15.4万**`,
+      text: `调度任务共 **5** 个：执行中 **1**，待响应 **2**，已完成 **2**。\n\n📌 **执行中**：高峰调峰任务-01（T001），目标 50MW，进度 65%，预计收益 ¥12.5万\n\n⏳ **待响应**：频率调节任务-A（14:00）、应急调频任务-B（16:00）\n\n✅ 今日完成累计收益：**¥15.4万**`,
       charts: [{
-        kind: 'kpi',
-        items: [
-          { label: '执行中', value: '1', color: '#00d4ff', sub: '个任务' },
-          { label: '待响应', value: '2', color: '#ffb800', sub: '个任务' },
-          { label: '今日完成', value: '2', color: '#00ff88', sub: '个任务' },
-          { label: '累计收益', value: '¥37.1万', color: '#00ff88', sub: '本日' },
+        kind: 'kpi', items: [
+          { label: '执行中', value: '1', color: '#00d4ff', sub: '个' },
+          { label: '待响应', value: '2', color: '#ffb800', sub: '个' },
+          { label: '已完成', value: '2', color: '#00ff88', sub: '个' },
+          { label: '日收益', value: '¥37.1万', color: '#00ff88' },
         ],
       }],
     };
   }
 
-  // 收益 / 结算 / 收入
-  if (/收益|结算|收入|盈利|收款/.test(lq)) {
-    const monthlyKpi = [
-      { name: '1月', 调峰: 98, 调频: 52, 辅助: 31 },
-      { name: '2月', 调峰: 112, 调频: 61, 辅助: 28 },
-      { name: '3月', 调峰: 135, 调频: 72, 辅助: 42 },
-    ].map(d => ({ ...d, total: d.调峰 + d.调频 + d.辅助 }));
+  if (/收益|结算|收入/.test(lq)) {
+    const bar = [
+      { name: '1月', 调峰: 98, 调频: 52, 辅助服务: 31 },
+      { name: '2月', 调峰: 112, 调频: 61, 辅助服务: 28 },
+      { name: '3月', 调峰: 135, 调频: 72, 辅助服务: 42 },
+    ];
     return {
-      text: `截至本月，年度累计收益 **¥387.2万**，较去年同期增长 **18.3%**。\n\n` +
-        `• 本月收益：**¥249万**（调峰 ¥135万 / 调频 ¥72万 / 辅助服务 ¥42万）\n` +
-        `• 已结算：**¥411,000**\n` +
-        `• 结算中：**¥108,000**\n` +
-        `• 待结算：**¥63,000**\n\n` +
-        `收益呈稳定上升趋势，3月环比增长 **20.5%**。`,
-      charts: [{
-        kind: 'bar',
-        data: monthlyKpi.map(d => ({ name: d.name, 调峰: d.调峰, 调频: d.调频, 辅助服务: d.辅助 })),
-        bars: [
-          { key: '调峰', color: '#00d4ff' },
-          { key: '调频', color: '#00ff88' },
-          { key: '辅助服务', color: '#ffb800' },
-        ],
-        unit: '千元',
-      }],
+      text: `年度累计收益 **¥387.2万**，同比增长 **18.3%**。\n\n• 本月：**¥249万**（调峰¥135万 / 调频¥72万 / 辅助¥42万）\n• 已结算：¥41.1万 · 结算中：¥10.8万 · 待结算：¥6.3万\n• 3月环比增长 **20.5%**`,
+      charts: [{ kind: 'bar', data: bar, bars: [{ key: '调峰', color: '#00d4ff' }, { key: '调频', color: '#00ff88' }, { key: '辅助服务', color: '#ffb800' }], unit: '千元' }],
     };
   }
 
-  // 离线 / 维护 / 不可用
-  if (/离线|维护|不可用|停机|停运/.test(lq)) {
-    const unavailable = mockDevices.filter(d => d.status !== '在线');
+  if (/离线|维护|不可用|停机/.test(lq)) {
+    const unavail = mockDevices.filter(d => d.status !== '在线');
     return {
-      text: `当前共 **${unavailable.length}** 台设备不在线：\n\n` +
-        unavailable.map(d =>
-          `• **${d.name}**（${d.status}）—— ${d.location}，额定 ${d.capacity}MW`
-        ).join('\n') +
-        `\n\n建议尽快恢复"${alertDevices[0]?.name ?? '告警设备'}"，以免影响调峰能力。`,
+      text: `当前 **${unavail.length}** 台设备不在线：\n\n` +
+        unavail.map(d => `• **${d.name}**（${d.status}）— ${d.location}，额定 ${d.capacity}MW`).join('\n'),
     };
   }
 
-  // 在线率 / 统计 / 分类
-  if (/在线率|统计|分类|各类型|各型/.test(lq)) {
+  if (/在线率|统计|分类|各类型/.test(lq)) {
     const types = ['光伏电站', '储能系统', '电网储能', '风电', '充电桩', '工业负荷'];
-    const statData = types.map(t => {
+    const stat = types.map(t => {
       const all = mockDevices.filter(d => d.type === t);
       const on = all.filter(d => d.status === '在线');
-      return { name: t.replace('电站', '').replace('系统', '').replace('工业', '工业\n'), total: all.length, online: on.length, rate: all.length > 0 ? Math.round(on.length / all.length * 100) : 0 };
+      return { name: t.replace('电站', '').replace('系统', ''), total: all.length, online: on.length, rate: all.length > 0 ? Math.round(on.length / all.length * 100) : 0 };
     }).filter(d => d.total > 0);
     return {
-      text: `设备在线率汇总（共 ${mockDevices.length} 台设备）：\n\n` +
-        statData.map(d => `• ${d.name}：${d.online}/${d.total} 台在线（在线率 **${d.rate}%**）`).join('\n') +
-        `\n\n整体在线率 **${Math.round(onlineDevices.length / mockDevices.length * 100)}%**，电网储能项目在线率 **100%**。`,
-      charts: [{
-        kind: 'bar',
-        data: statData.map(d => ({ name: d.name, 在线率: d.rate })),
-        bars: [{ key: '在线率', color: '#00d4ff' }],
-        unit: '%',
-      }],
+      text: `整体在线率 **${Math.round(onlineDevices.length / mockDevices.length * 100)}%**（${onlineDevices.length}/${mockDevices.length} 台）：\n\n` +
+        stat.map(d => `• ${d.name}：${d.online}/${d.total} 台（**${d.rate}%**）`).join('\n'),
+      charts: [{ kind: 'bar', data: stat.map(d => ({ name: d.name, 在线率: d.rate })), bars: [{ key: '在线率', color: '#00d4ff' }], unit: '%' }],
     };
   }
 
-  // 可调容量 / 容量 / 总装机
-  if (/可调容量|装机|总容量|容量|储能容量/.test(lq)) {
-    const gsCapacity = gridStorage.reduce((a, d) => a + d.capacity, 0);
-    const gsEnergy = gridStorage.reduce((a, d) => a + (d.energyCapacity ?? 0), 0);
-    const pieData = [
-      { name: '光伏', value: 75, color: '#ffb800' },
-      { name: '电网储能', value: gsCapacity, color: '#38bdf8' },
-      { name: '储能系统', value: 35, color: '#00d4ff' },
-      { name: '风电', value: 50, color: '#00ff88' },
-      { name: '柔性负荷', value: 83, color: '#a78bfa' },
-    ];
-    const total = 75 + gsCapacity + 35 + 50 + 83;
+  if (/可调容量|装机|总容量|容量/.test(lq)) {
+    const gsCap = gridStorage.reduce((a, d) => a + d.capacity, 0);
+    const total = 75 + gsCap + 35 + 50 + 83;
     return {
-      text: `平台聚合资源总可调容量 **${total} MW**，其中：\n\n` +
-        `• 电网侧独立储能：**${gsCapacity} MW / ${gsEnergy} MWh**（${gridStorage.length}个项目）\n` +
-        `• 光伏：**75 MW**\n• 用户侧储能：**35 MW**\n• 风电：**50 MW**\n• 柔性负荷：**83 MW**\n\n` +
-        `电网储能占总容量的 **${Math.round(gsCapacity / total * 100)}%**，是平台最核心的调节资源。`,
-      charts: [{ kind: 'pie', data: pieData }],
+      text: `总可调容量 **${total} MW**：\n\n• 电网储能：**${gsCap} MW**（${Math.round(gsCap / total * 100)}%）\n• 柔性负荷：**83 MW** · 光伏：**75 MW** · 风电：**50 MW** · 用户储能：**35 MW**`,
+      charts: [{ kind: 'pie', data: [{ name: '电网储能', value: gsCap, color: '#38bdf8' }, { name: '柔性负荷', value: 83, color: '#a78bfa' }, { name: '光伏', value: 75, color: '#ffb800' }, { name: '风电', value: 50, color: '#00ff88' }, { name: '用户储能', value: 35, color: '#00d4ff' }] }],
     };
   }
 
-  // 整体 / 系统状态 / 运行状态 / 综合
-  if (/整体|系统状态|运行状态|综合|总体|概况|平台|今天|今日.*状态/.test(lq)) {
-    const totalCapacity = mockDevices.reduce((a, d) => a + d.capacity, 0);
-    const totalPower = onlineDevices.reduce((a, d) => a + d.currentPower, 0);
-    return {
-      text: `**VPP 平台当前整体运行状态良好** ✅\n\n` +
-        `• 总装机容量：**${totalCapacity} MW**\n` +
-        `• 当前出力：**${totalPower.toFixed(1)} MW**（利用率 ${Math.round(totalPower / totalCapacity * 100)}%）\n` +
-        `• 设备总数：**${mockDevices.length} 台**，在线 ${onlineDevices.length} 台，告警 ${alertDevices.length} 台\n` +
-        `• 电网频率：**50.03 Hz**（正常范围 50±0.2Hz）\n` +
-        `• 今日发电量：**1842.6 MWh**\n` +
-        `• 碳减排：**921.3 tCO₂**\n\n` +
-        `⚠️ 注意：充电桩群-CBD 存在通信中断告警，请及时处理。`,
-      charts: [{
-        kind: 'kpi',
-        items: [
-          { label: '总出力', value: `${totalPower.toFixed(0)}MW`, color: '#00d4ff', sub: `/ ${totalCapacity}MW` },
-          { label: '在线设备', value: String(onlineDevices.length), color: '#00ff88', sub: `/ ${mockDevices.length}台` },
-          { label: '今日电量', value: '1842.6', color: '#ffb800', sub: 'MWh' },
-          { label: '频率偏差', value: '+0.03', color: '#00ff88', sub: 'Hz' },
-        ],
-      }],
-    };
-  }
-
-  // 默认回答
   return {
-    text: `您好！我是 VPP 智能运营助手。我可以帮您查询：\n\n` +
-      `📊 **实时数据**：设备状态、出力数据、SOC状态、频率电压\n` +
-      `⚡ **调度运营**：需求响应任务、调峰调频情况\n` +
-      `💰 **收益结算**：月度收益、补贴明细、结算状态\n` +
-      `🔋 **储能管理**：电网储能项目、各站点运行情况\n\n` +
-      `您可以直接用自然语言提问，例如："各储能站SOC多少？" 或 "本月收益怎么样？"`,
+    text: `当前 VPP 平台运行正常 ✅\n\n• 总出力：**${onlineDevices.reduce((a, d) => a + d.currentPower, 0).toFixed(1)} MW** / ${mockDevices.reduce((a, d) => a + d.capacity, 0)} MW\n• 在线设备：**${onlineDevices.length}** 台，告警 **${alertDevices.length}** 台\n• 今日发电量：**1842.6 MWh**，碳减排 **921.3 tCO₂**\n• 电网频率：**50.03 Hz**（正常）\n\n⚠️ 充电桩群-CBD 通信中断，请及时处理。`,
+    charts: [{
+      kind: 'kpi', items: [
+        { label: '当前出力', value: `${onlineDevices.reduce((a, d) => a + d.currentPower, 0).toFixed(0)}MW`, color: '#00d4ff' },
+        { label: '在线设备', value: `${onlineDevices.length}台`, color: '#00ff88' },
+        { label: '今日电量', value: '1842.6MWh', color: '#ffb800' },
+        { label: '频率', value: '50.03Hz', color: '#00ff88' },
+      ],
+    }],
   };
 }
 
-// ─── 子组件：图表渲染 ────────────────────────────────────────────
-const CHART_COLORS = ['#00d4ff', '#00ff88', '#ffb800', '#a78bfa', '#38bdf8', '#fb923c'];
+// ─── 图表渲染 ─────────────────────────────────────────────────────
+const COLORS = ['#00d4ff', '#00ff88', '#ffb800', '#a78bfa', '#38bdf8', '#fb923c'];
 
 function ChartRenderer({ block }: { block: ChartBlock }) {
-  const cardStyle: React.CSSProperties = {
-    background: '#0a0e1a',
-    borderRadius: 10,
-    padding: '12px 8px 4px',
-    marginTop: 10,
+  const wrap: React.CSSProperties = {
+    background: '#0a0e1a', borderRadius: 10,
+    padding: '12px 8px 4px', marginTop: 10,
     border: '1px solid rgba(0,212,255,0.12)',
   };
 
-  if (block.kind === 'kpi') {
-    return (
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
-        {block.items.map(item => (
-          <div key={item.label} style={{
-            background: '#0a0e1a', border: `1px solid ${item.color}30`,
-            borderRadius: 8, padding: '8px 14px', flex: '1 1 100px', minWidth: 90,
-          }}>
-            <div style={{ color: '#4a6080', fontSize: 11 }}>{item.label}</div>
-            <div style={{ color: item.color, fontSize: 20, fontWeight: 700, lineHeight: 1.2 }}>{item.value}</div>
-            {item.sub && <div style={{ color: '#4a6080', fontSize: 10 }}>{item.sub}</div>}
-          </div>
-        ))}
-      </div>
-    );
-  }
-
-  if (block.kind === 'bar') {
-    return (
-      <div style={cardStyle}>
-        <ResponsiveContainer width="100%" height={180}>
-          <BarChart data={block.data} margin={{ top: 4, right: 12, left: -16, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-            <XAxis dataKey="name" stroke="#4a6080" tick={{ fontSize: 11 }} />
-            <YAxis stroke="#4a6080" tick={{ fontSize: 11 }} unit={block.unit ? ` ${block.unit}` : ''} />
-            <Tooltip
-              contentStyle={{ background: '#1a2540', border: '1px solid #00d4ff', borderRadius: 6, fontSize: 12 }}
-              formatter={(v) => [`${v}${block.unit ?? ''}`, '']}
-            />
-            {block.bars.length > 1 && <Legend wrapperStyle={{ fontSize: 11 }} />}
-            {block.bars.map(b => (
-              <Bar key={b.key} dataKey={b.key} fill={b.color} radius={[3, 3, 0, 0]} />
-            ))}
-          </BarChart>
-        </ResponsiveContainer>
-      </div>
-    );
-  }
-
-  if (block.kind === 'pie') {
-    return (
-      <div style={cardStyle}>
-        <ResponsiveContainer width="100%" height={200}>
-          <PieChart>
-            <Pie
-              data={block.data}
-              cx="50%"
-              cy="50%"
-              innerRadius={50}
-              outerRadius={80}
-              dataKey="value"
-              label={({ name, percent }: { name?: string; percent?: number }) =>
-                `${name ?? ''} ${((percent ?? 0) * 100).toFixed(0)}%`
-              }
-              labelLine={{ stroke: '#4a6080' }}
-            >
-              {block.data.map((entry, i) => (
-                <Cell key={i} fill={entry.color ?? CHART_COLORS[i % CHART_COLORS.length]} />
-              ))}
-            </Pie>
-            <Tooltip
-              contentStyle={{ background: '#1a2540', border: '1px solid #00d4ff', borderRadius: 6, fontSize: 12 }}
-              formatter={(v) => [`${v} MW`, '']}
-            />
-          </PieChart>
-        </ResponsiveContainer>
-      </div>
-    );
-  }
-
-  if (block.kind === 'radial') {
-    return (
-      <div style={cardStyle}>
-        <ResponsiveContainer width="100%" height={180}>
-          <RadialBarChart cx="50%" cy="50%" innerRadius={20} outerRadius={90} data={block.data}>
-            <RadialBar dataKey="value" label={{ position: 'insideStart', fill: '#aab4c8', fontSize: 10 }} />
-            <Legend iconSize={8} wrapperStyle={{ fontSize: 11 }} />
-            <Tooltip
-              contentStyle={{ background: '#1a2540', border: '1px solid #00d4ff', borderRadius: 6, fontSize: 12 }}
-            />
-          </RadialBarChart>
-        </ResponsiveContainer>
-      </div>
-    );
-  }
-
-  if (block.kind === 'table') {
-    return (
-      <div style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
-            <thead>
-              <tr>
-                {block.head.map(h => (
-                  <th key={h} style={{
-                    padding: '8px 10px', background: 'rgba(0,212,255,0.08)',
-                    color: '#00d4ff', fontWeight: 600, textAlign: 'left',
-                    borderBottom: '1px solid rgba(0,212,255,0.15)', whiteSpace: 'nowrap',
-                  }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {block.rows.map((row, ri) => (
-                <tr key={ri} style={{ background: ri % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)' }}>
-                  {row.map((cell, ci) => (
-                    <td key={ci} style={{
-                      padding: '7px 10px', color: ci === 0 ? '#00d4ff' : '#aab4c8',
-                      borderBottom: '1px solid rgba(255,255,255,0.04)', whiteSpace: 'nowrap',
-                    }}>{cell}</td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
+  if (block.kind === 'kpi') return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
+      {block.items.map(item => (
+        <div key={item.label} style={{ background: '#0a0e1a', border: `1px solid ${item.color}30`, borderRadius: 8, padding: '8px 14px', flex: '1 1 90px', minWidth: 80 }}>
+          <div style={{ color: '#4a6080', fontSize: 11 }}>{item.label}</div>
+          <div style={{ color: item.color, fontSize: 18, fontWeight: 700, lineHeight: 1.2 }}>{item.value}</div>
+          {item.sub && <div style={{ color: '#4a6080', fontSize: 10 }}>{item.sub}</div>}
         </div>
+      ))}
+    </div>
+  );
+
+  if (block.kind === 'bar') return (
+    <div style={wrap}>
+      <ResponsiveContainer width="100%" height={180}>
+        <BarChart data={block.data} margin={{ top: 4, right: 8, left: -18, bottom: 0 }}>
+          <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+          <XAxis dataKey="name" stroke="#4a6080" tick={{ fontSize: 11 }} />
+          <YAxis stroke="#4a6080" tick={{ fontSize: 11 }} unit={block.unit ? ` ${block.unit}` : ''} />
+          <RTooltip contentStyle={{ background: '#1a2540', border: '1px solid #00d4ff', borderRadius: 6, fontSize: 12 }} formatter={(v) => [`${v}${block.unit ?? ''}`, '']} />
+          {block.bars.length > 1 && <Legend wrapperStyle={{ fontSize: 11 }} />}
+          {block.bars.map(b => <Bar key={b.key} dataKey={b.key} fill={b.color} radius={[3, 3, 0, 0]} />)}
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+
+  if (block.kind === 'pie') return (
+    <div style={wrap}>
+      <ResponsiveContainer width="100%" height={200}>
+        <PieChart>
+          <Pie data={block.data} cx="50%" cy="50%" innerRadius={45} outerRadius={75} dataKey="value"
+            label={({ name, percent }: { name?: string; percent?: number }) => `${name ?? ''} ${((percent ?? 0) * 100).toFixed(0)}%`}
+            labelLine={{ stroke: '#4a6080' }}>
+            {block.data.map((entry, i) => <Cell key={i} fill={entry.color ?? COLORS[i % COLORS.length]} />)}
+          </Pie>
+          <RTooltip contentStyle={{ background: '#1a2540', border: '1px solid #00d4ff', borderRadius: 6, fontSize: 12 }} formatter={(v) => [`${v} MW`, '']} />
+        </PieChart>
+      </ResponsiveContainer>
+    </div>
+  );
+
+  if (block.kind === 'table') return (
+    <div style={{ ...wrap, padding: 0, overflow: 'hidden' }}>
+      <div style={{ overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 12 }}>
+          <thead>
+            <tr>{block.head.map(h => <th key={h} style={{ padding: '8px 10px', background: 'rgba(0,212,255,0.08)', color: '#00d4ff', fontWeight: 600, textAlign: 'left', borderBottom: '1px solid rgba(0,212,255,0.15)', whiteSpace: 'nowrap' }}>{h}</th>)}</tr>
+          </thead>
+          <tbody>
+            {block.rows.map((row, ri) => (
+              <tr key={ri} style={{ background: ri % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)' }}>
+                {row.map((cell, ci) => <td key={ci} style={{ padding: '7px 10px', color: ci === 0 ? '#00d4ff' : '#aab4c8', borderBottom: '1px solid rgba(255,255,255,0.04)', whiteSpace: 'nowrap' }}>{cell}</td>)}
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
-    );
-  }
+    </div>
+  );
 
   return null;
 }
 
-// ─── 文本渲染（支持 **加粗** 和换行）───────────────────────────
+// ─── Markdown 粗体 + 换行渲染 ─────────────────────────────────────
 function RenderText({ text }: { text: string }) {
   return (
-    <div style={{ lineHeight: 1.7 }}>
-      {text.split('\n').map((line, i) => {
-        const parts = line.split(/(\*\*[^*]+\*\*)/g);
-        return (
-          <div key={i} style={{ marginBottom: line === '' ? 6 : 0 }}>
-            {parts.map((part, j) =>
-              part.startsWith('**') && part.endsWith('**')
-                ? <strong key={j} style={{ color: '#fff', fontWeight: 600 }}>{part.slice(2, -2)}</strong>
-                : <span key={j}>{part}</span>
-            )}
-          </div>
-        );
-      })}
+    <div style={{ lineHeight: 1.75 }}>
+      {text.split('\n').map((line, i) => (
+        <div key={i} style={{ marginBottom: line === '' ? 4 : 0 }}>
+          {line.split(/(\*\*[^*]+\*\*)/g).map((part, j) =>
+            part.startsWith('**') && part.endsWith('**')
+              ? <strong key={j} style={{ color: '#fff', fontWeight: 600 }}>{part.slice(2, -2)}</strong>
+              : <span key={j}>{part}</span>
+          )}
+        </div>
+      ))}
     </div>
+  );
+}
+
+// ─── API Key 设置弹窗 ─────────────────────────────────────────────
+function ApiKeyModal({ open, onClose, onSave }: { open: boolean; onClose: () => void; onSave: (key: string) => void }) {
+  const [val, setVal] = useState(() => localStorage.getItem('vpp_claude_key') ?? '');
+  return (
+    <Modal
+      title={<span style={{ color: '#00d4ff' }}><KeyOutlined /> 配置 Claude API Key</span>}
+      open={open}
+      onCancel={onClose}
+      onOk={() => { onSave(val.trim()); onClose(); }}
+      okText="保存"
+      cancelText="取消"
+      okButtonProps={{ style: { background: '#00d4ff', border: 'none', color: '#0a0e1a' } }}
+    >
+      <div style={{ marginTop: 8 }}>
+        <Alert
+          message="API Key 仅保存在本地浏览器（localStorage），不会上传到任何服务器"
+          type="info" showIcon
+          style={{ marginBottom: 16, fontSize: 12 }}
+        />
+        <Input.Password
+          value={val}
+          onChange={e => setVal(e.target.value)}
+          placeholder="sk-ant-api03-..."
+          style={{ fontFamily: 'monospace' }}
+        />
+        <div style={{ color: '#6b7280', fontSize: 12, marginTop: 8 }}>
+          前往 <a href="https://console.anthropic.com" target="_blank" rel="noreferrer" style={{ color: '#00d4ff' }}>console.anthropic.com</a> 获取 API Key
+        </div>
+        {val && (
+          <div style={{ marginTop: 8 }}>
+            <Button size="small" danger onClick={() => setVal('')}>清除 Key</Button>
+          </div>
+        )}
+      </div>
+    </Modal>
   );
 }
 
@@ -431,215 +374,226 @@ interface AIAssistantProps {
   onClose: () => void;
 }
 
+const INIT_MSG: AIMessage = {
+  id: 'init', role: 'assistant', source: 'mock',
+  text: '您好！我是 **VPP 智能运营助手** 🤖\n\n配置 Claude API Key 后，我将使用真实 AI 理解并回答您的问题；未配置时使用内置知识库快速响应。\n\n请从下方选择常见问题，或直接输入您的问题：',
+  ts: new Date(),
+};
+
 export default function AIAssistant({ open, onClose }: AIAssistantProps) {
-  const [messages, setMessages] = useState<AIMessage[]>([
-    {
-      id: 'init',
-      role: 'assistant',
-      text: '您好！我是 **VPP 智能运营助手** 🤖\n\n我可以通过自然语言帮您查询设备状态、调度任务、收益数据、储能SOC等各类运营信息，并以图表形式直观呈现。\n\n请从下方选择常见问题，或直接输入您的问题：',
-      ts: new Date(),
-    },
-  ]);
+  const [messages, setMessages] = useState<AIMessage[]>([INIT_MSG]);
   const [input, setInput] = useState('');
   const [thinking, setThinking] = useState(false);
+  const [apiKey, setApiKey] = useState<string>(() => localStorage.getItem('vpp_claude_key') ?? '');
+  const [keyModalOpen, setKeyModalOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  const hasKey = apiKey.length > 10;
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, thinking]);
 
-  const send = (question: string) => {
-    const q = question.trim();
-    if (!q || thinking) return;
+  const saveKey = (key: string) => {
+    localStorage.setItem('vpp_claude_key', key);
+    setApiKey(key);
+  };
 
-    const userMsg: AIMessage = {
-      id: Date.now().toString(),
-      role: 'user',
-      text: q,
-      ts: new Date(),
-    };
+  // 快捷问题 → Mock 即时响应
+  const sendMock = (question: string) => {
+    if (thinking) return;
+    const userMsg: AIMessage = { id: Date.now().toString(), role: 'user', text: question, ts: new Date() };
+    setMessages(prev => [...prev, userMsg]);
+    setThinking(true);
+    setTimeout(() => {
+      const resp = buildMockResponse(question);
+      setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'assistant', source: 'mock', text: resp.text, charts: resp.charts, ts: new Date() }]);
+      setThinking(false);
+    }, 400 + Math.random() * 300);
+  };
+
+  // 自由输入 → Claude API 流式响应 / 降级 Mock
+  const sendAI = async (question: string) => {
+    if (thinking) return;
+    const userMsg: AIMessage = { id: Date.now().toString(), role: 'user', text: question, ts: new Date() };
     setMessages(prev => [...prev, userMsg]);
     setInput('');
     setThinking(true);
 
-    const delay = 600 + Math.random() * 600;
-    setTimeout(() => {
-      const resp = buildResponse(q);
-      const aiMsg: AIMessage = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        text: resp.text,
-        charts: resp.charts,
-        ts: new Date(),
-      };
-      setMessages(prev => [...prev, aiMsg]);
-      setThinking(false);
-    }, delay);
+    if (!hasKey) {
+      // 无 Key → Mock
+      setTimeout(() => {
+        const resp = buildMockResponse(question);
+        setMessages(prev => [...prev, { id: (Date.now() + 1).toString(), role: 'assistant', source: 'mock', text: resp.text, charts: resp.charts, ts: new Date() }]);
+        setThinking(false);
+      }, 500);
+      return;
+    }
+
+    // 有 Key → 真实 Claude API 流式
+    const msgId = (Date.now() + 1).toString();
+    setMessages(prev => [...prev, { id: msgId, role: 'assistant', source: 'ai', text: '', streaming: true, ts: new Date() }]);
+    setThinking(false);
+
+    try {
+      const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true });
+      const stream = client.messages.stream({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 1024,
+        system: buildSystemPrompt(),
+        messages: [{ role: 'user', content: question }],
+      });
+
+      let fullText = '';
+      stream.on('text', (chunk) => {
+        fullText += chunk;
+        setMessages(prev => prev.map(m => m.id === msgId ? { ...m, text: fullText } : m));
+      });
+
+      await stream.finalMessage();
+      setMessages(prev => prev.map(m => m.id === msgId ? { ...m, streaming: false } : m));
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      setMessages(prev => prev.map(m =>
+        m.id === msgId ? { ...m, text: `❌ 请求失败：${errMsg}\n\n请检查 API Key 是否有效，或网络是否正常。`, streaming: false } : m
+      ));
+    }
   };
 
   return (
-    <Drawer
-      title={
-        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div style={{
-            width: 32, height: 32, borderRadius: 8,
-            background: 'linear-gradient(135deg, rgba(0,212,255,0.3), rgba(0,255,136,0.2))',
-            border: '1px solid rgba(0,212,255,0.4)',
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-          }}>
-            <RobotOutlined style={{ color: '#00d4ff', fontSize: 16 }} />
-          </div>
-          <div>
-            <div style={{ color: '#00d4ff', fontWeight: 700, fontSize: 15 }}>智能问数</div>
-            <div style={{ color: '#4a6080', fontSize: 11, fontWeight: 400 }}>VPP AI 运营助手</div>
-          </div>
-        </div>
-      }
-      open={open}
-      onClose={onClose}
-      width={480}
-      styles={{
-        body: { background: '#0d1526', padding: 0, display: 'flex', flexDirection: 'column' },
-        header: { background: '#0d1526', borderBottom: '1px solid rgba(0,212,255,0.12)' },
-        wrapper: { boxShadow: '-4px 0 24px rgba(0,0,0,0.5)' },
-      }}
-    >
-      {/* 消息区 */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 8px' }}>
-        {messages.map(msg => (
-          <div key={msg.id} style={{
-            display: 'flex',
-            flexDirection: msg.role === 'user' ? 'row-reverse' : 'row',
-            gap: 8, marginBottom: 16, alignItems: 'flex-start',
-          }}>
-            {/* Avatar */}
-            <div style={{
-              width: 30, height: 30, borderRadius: 8, flexShrink: 0,
-              background: msg.role === 'user'
-                ? 'rgba(0,212,255,0.15)'
-                : 'linear-gradient(135deg, rgba(0,212,255,0.25), rgba(0,255,136,0.15))',
-              border: `1px solid ${msg.role === 'user' ? 'rgba(0,212,255,0.3)' : 'rgba(0,212,255,0.4)'}`,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              {msg.role === 'user'
-                ? <UserOutlined style={{ color: '#00d4ff', fontSize: 13 }} />
-                : <RobotOutlined style={{ color: '#00d4ff', fontSize: 13 }} />
-              }
-            </div>
-
-            {/* Bubble */}
-            <div style={{ maxWidth: '85%' }}>
-              <div style={{
-                background: msg.role === 'user'
-                  ? 'rgba(0,212,255,0.12)'
-                  : 'rgba(255,255,255,0.04)',
-                border: `1px solid ${msg.role === 'user' ? 'rgba(0,212,255,0.25)' : 'rgba(255,255,255,0.07)'}`,
-                borderRadius: msg.role === 'user' ? '12px 4px 12px 12px' : '4px 12px 12px 12px',
-                padding: '10px 14px',
-                color: '#d1d9e6',
-                fontSize: 13,
-              }}>
-                <RenderText text={msg.text} />
-                {msg.charts?.map((block, i) => (
-                  <ChartRenderer key={i} block={block} />
-                ))}
+    <>
+      <Drawer
+        title={
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ width: 32, height: 32, borderRadius: 8, background: 'linear-gradient(135deg,rgba(0,212,255,0.3),rgba(0,255,136,0.2))', border: '1px solid rgba(0,212,255,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <RobotOutlined style={{ color: '#00d4ff', fontSize: 16 }} />
               </div>
-              <div style={{
-                color: '#2d3748', fontSize: 10, marginTop: 3,
-                textAlign: msg.role === 'user' ? 'right' : 'left',
-              }}>
-                {msg.ts.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}
+              <div>
+                <div style={{ color: '#00d4ff', fontWeight: 700, fontSize: 15 }}>智能问数</div>
+                <div style={{ color: '#4a6080', fontSize: 11, fontWeight: 400 }}>VPP AI 运营助手</div>
               </div>
             </div>
+            <Tooltip title={hasKey ? `已配置 Claude API Key（${apiKey.slice(0, 12)}...）` : '点击配置 Claude API Key，启用真实 AI 对话'}>
+              <Button
+                size="small"
+                icon={hasKey ? <CheckCircleOutlined /> : <ApiOutlined />}
+                onClick={() => setKeyModalOpen(true)}
+                style={{
+                  background: hasKey ? 'rgba(0,255,136,0.1)' : 'rgba(255,184,0,0.1)',
+                  border: `1px solid ${hasKey ? '#00ff88' : '#ffb800'}`,
+                  color: hasKey ? '#00ff88' : '#ffb800',
+                  fontSize: 12, borderRadius: 6,
+                }}
+              >
+                {hasKey ? 'AI 已接入' : '配置 API Key'}
+              </Button>
+            </Tooltip>
           </div>
-        ))}
+        }
+        open={open}
+        onClose={onClose}
+        width={490}
+        styles={{
+          body: { background: '#0d1526', padding: 0, display: 'flex', flexDirection: 'column' },
+          header: { background: '#0d1526', borderBottom: '1px solid rgba(0,212,255,0.12)' },
+          wrapper: { boxShadow: '-4px 0 24px rgba(0,0,0,0.5)' },
+        }}
+      >
+        {/* 消息区 */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 8px' }}>
+          {messages.map(msg => (
+            <div key={msg.id} style={{ display: 'flex', flexDirection: msg.role === 'user' ? 'row-reverse' : 'row', gap: 8, marginBottom: 16, alignItems: 'flex-start' }}>
+              {/* Avatar */}
+              <div style={{ width: 30, height: 30, borderRadius: 8, flexShrink: 0, background: msg.role === 'user' ? 'rgba(0,212,255,0.15)' : 'linear-gradient(135deg,rgba(0,212,255,0.25),rgba(0,255,136,0.15))', border: `1px solid ${msg.role === 'user' ? 'rgba(0,212,255,0.3)' : 'rgba(0,212,255,0.4)'}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                {msg.role === 'user' ? <UserOutlined style={{ color: '#00d4ff', fontSize: 13 }} /> : <RobotOutlined style={{ color: '#00d4ff', fontSize: 13 }} />}
+              </div>
 
-        {/* 思考动画 */}
-        {thinking && (
-          <div style={{ display: 'flex', gap: 8, marginBottom: 16, alignItems: 'flex-start' }}>
-            <div style={{
-              width: 30, height: 30, borderRadius: 8, flexShrink: 0,
-              background: 'linear-gradient(135deg, rgba(0,212,255,0.25), rgba(0,255,136,0.15))',
-              border: '1px solid rgba(0,212,255,0.4)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-            }}>
-              <RobotOutlined style={{ color: '#00d4ff', fontSize: 13 }} />
+              {/* Bubble */}
+              <div style={{ maxWidth: '86%' }}>
+                <div style={{ background: msg.role === 'user' ? 'rgba(0,212,255,0.12)' : 'rgba(255,255,255,0.04)', border: `1px solid ${msg.role === 'user' ? 'rgba(0,212,255,0.25)' : 'rgba(255,255,255,0.07)'}`, borderRadius: msg.role === 'user' ? '12px 4px 12px 12px' : '4px 12px 12px 12px', padding: '10px 14px', color: '#d1d9e6', fontSize: 13 }}>
+                  <RenderText text={msg.text || (msg.streaming ? '▍' : '')} />
+                  {msg.charts?.map((b, i) => <ChartRenderer key={i} block={b} />)}
+                </div>
+                <div style={{ display: 'flex', gap: 8, marginTop: 3, alignItems: 'center', justifyContent: msg.role === 'user' ? 'flex-end' : 'flex-start' }}>
+                  {msg.role === 'assistant' && msg.source === 'ai' && (
+                    <span style={{ color: '#00ff88', fontSize: 10, background: 'rgba(0,255,136,0.08)', padding: '1px 6px', borderRadius: 4, border: '1px solid rgba(0,255,136,0.2)' }}>Claude AI</span>
+                  )}
+                  {msg.role === 'assistant' && msg.source === 'mock' && (
+                    <span style={{ color: '#4a6080', fontSize: 10, background: 'rgba(255,255,255,0.04)', padding: '1px 6px', borderRadius: 4, border: '1px solid rgba(255,255,255,0.06)' }}>知识库</span>
+                  )}
+                  <span style={{ color: '#2d3748', fontSize: 10 }}>{msg.ts.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' })}</span>
+                </div>
+              </div>
             </div>
-            <div style={{
-              background: 'rgba(255,255,255,0.04)',
-              border: '1px solid rgba(255,255,255,0.07)',
-              borderRadius: '4px 12px 12px 12px',
-              padding: '12px 16px',
-              color: '#4a6080', fontSize: 13,
-              display: 'flex', alignItems: 'center', gap: 8,
-            }}>
-              <LoadingOutlined style={{ color: '#00d4ff' }} />
-              <span>正在分析数据...</span>
-            </div>
-          </div>
-        )}
-        <div ref={bottomRef} />
-      </div>
-
-      {/* 常见问题 */}
-      <div style={{
-        padding: '10px 16px 6px',
-        borderTop: '1px solid rgba(255,255,255,0.05)',
-        background: 'rgba(0,0,0,0.2)',
-      }}>
-        <div style={{ color: '#4a6080', fontSize: 11, marginBottom: 8 }}>常见运营问题</div>
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-          {SUGGESTED_QUESTIONS.map(q => (
-            <Tag
-              key={q}
-              style={{
-                background: 'rgba(0,212,255,0.08)',
-                border: '1px solid rgba(0,212,255,0.2)',
-                color: '#aab4c8', fontSize: 11,
-                cursor: 'pointer', borderRadius: 6,
-                padding: '2px 8px', margin: 0,
-                transition: 'all 0.2s',
-              }}
-              onClick={() => send(q)}
-            >
-              {q}
-            </Tag>
           ))}
-        </div>
-      </div>
 
-      {/* 输入框 */}
-      <div style={{
-        padding: '10px 16px 16px',
-        borderTop: '1px solid rgba(255,255,255,0.05)',
-        background: '#0d1526',
-        display: 'flex', gap: 8,
-      }}>
-        <Input
-          value={input}
-          onChange={e => setInput(e.target.value)}
-          onPressEnter={() => send(input)}
-          placeholder="输入问题，例如：各储能站SOC状态？"
-          style={{
-            background: 'rgba(255,255,255,0.04)',
-            border: '1px solid rgba(0,212,255,0.2)',
-            color: '#e2e8f0', borderRadius: 8,
-            fontSize: 13,
-          }}
-          disabled={thinking}
-        />
-        <Button
-          type="primary"
-          icon={<SendOutlined />}
-          onClick={() => send(input)}
-          disabled={!input.trim() || thinking}
-          style={{
-            background: '#00d4ff', border: 'none',
-            color: '#0a0e1a', borderRadius: 8,
-            fontWeight: 600,
-          }}
-        />
-      </div>
-    </Drawer>
+          {thinking && (
+            <div style={{ display: 'flex', gap: 8, marginBottom: 16, alignItems: 'flex-start' }}>
+              <div style={{ width: 30, height: 30, borderRadius: 8, background: 'linear-gradient(135deg,rgba(0,212,255,0.25),rgba(0,255,136,0.15))', border: '1px solid rgba(0,212,255,0.4)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                <RobotOutlined style={{ color: '#00d4ff', fontSize: 13 }} />
+              </div>
+              <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)', borderRadius: '4px 12px 12px 12px', padding: '12px 16px', color: '#4a6080', fontSize: 13, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <LoadingOutlined style={{ color: '#00d4ff' }} />
+                <span>正在分析数据...</span>
+              </div>
+            </div>
+          )}
+          <div ref={bottomRef} />
+        </div>
+
+        {/* 常见问题 */}
+        <div style={{ padding: '10px 16px 6px', borderTop: '1px solid rgba(255,255,255,0.05)', background: 'rgba(0,0,0,0.2)' }}>
+          <div style={{ color: '#4a6080', fontSize: 11, marginBottom: 8 }}>
+            常见运营问题
+            <span style={{ marginLeft: 6, color: '#2d3748' }}>（点击即时回答）</span>
+          </div>
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+            {SUGGESTED_QUESTIONS.map(q => (
+              <Tag key={q} style={{ background: 'rgba(0,212,255,0.07)', border: '1px solid rgba(0,212,255,0.18)', color: '#aab4c8', fontSize: 11, cursor: 'pointer', borderRadius: 6, padding: '2px 8px', margin: 0 }}
+                onClick={() => sendMock(q)}>
+                {q}
+              </Tag>
+            ))}
+          </div>
+        </div>
+
+        {/* 输入框 */}
+        <div style={{ padding: '10px 16px 16px', borderTop: '1px solid rgba(255,255,255,0.05)', background: '#0d1526' }}>
+          {!hasKey && (
+            <div style={{ color: '#4a6080', fontSize: 11, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+              <SettingOutlined />
+              <span>配置 API Key 后，输入框将启用真实 Claude AI 对话</span>
+              <span style={{ color: '#00d4ff', cursor: 'pointer' }} onClick={() => setKeyModalOpen(true)}>立即配置 →</span>
+            </div>
+          )}
+          <div style={{ display: 'flex', gap: 8 }}>
+            <Input
+              value={input}
+              onChange={e => setInput(e.target.value)}
+              onPressEnter={() => { if (input.trim()) sendAI(input.trim()); }}
+              placeholder={hasKey ? '用自然语言提问，Claude AI 将实时回答...' : '配置 API Key 后可自由提问（当前使用知识库模式）'}
+              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(0,212,255,0.2)', color: '#e2e8f0', borderRadius: 8, fontSize: 13 }}
+              disabled={thinking}
+            />
+            <Button
+              type="primary"
+              icon={<SendOutlined />}
+              onClick={() => { if (input.trim()) sendAI(input.trim()); }}
+              disabled={!input.trim() || thinking}
+              style={{ background: '#00d4ff', border: 'none', color: '#0a0e1a', borderRadius: 8, fontWeight: 600 }}
+            />
+          </div>
+          {hasKey && (
+            <div style={{ color: '#4a6080', fontSize: 10, marginTop: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
+              <CheckCircleOutlined style={{ color: '#00ff88' }} />
+              <span>已接入 Claude AI · 流式输出 · 模型 claude-haiku-4-5</span>
+            </div>
+          )}
+        </div>
+      </Drawer>
+
+      <ApiKeyModal open={keyModalOpen} onClose={() => setKeyModalOpen(false)} onSave={saveKey} />
+    </>
   );
 }
