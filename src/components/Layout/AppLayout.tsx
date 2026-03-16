@@ -45,7 +45,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           padding: collapsed ? 0 : '0 20px',
           borderBottom: '1px solid rgba(0, 212, 255, 0.15)',
         }}>
-          <span style={{ fontSize: 22, marginRight: collapsed ? 0 : 10 }}>⚡</span>
+          <img src="/vpp-app/Huitone-logo.png" alt="logo" style={{ height: 36, maxWidth: collapsed ? 36 : 140, objectFit: 'contain', marginRight: collapsed ? 0 : 10 }} />
           {!collapsed && (
             <span style={{ color: '#00d4ff', fontWeight: 700, fontSize: 15, letterSpacing: 1 }}>
               Guangzhou HuiTone Technology
