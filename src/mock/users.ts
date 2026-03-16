@@ -48,9 +48,9 @@ export const roles: Record<RoleKey, Role> = {
 };
 
 export const mockUsers: MockUser[] = [
-  { username: 'admin',   password: 'admin123',  name: '张建国', email: 'zhang@huitone.com', roleKey: 'sales_gm' },
-  { username: 'sales',   password: 'sales123',  name: '李晓梅', email: 'li@huitone.com',    roleKey: 'sales_manager' },
-  { username: 'trading', password: 'trade123',  name: '王志远', email: 'wang@huitone.com',  roleKey: 'trading_director' },
-  { username: 'trader',  password: 'trader123', name: '陈慧敏', email: 'chen@huitone.com',  roleKey: 'trading_manager' },
-  { username: 'ops',     password: 'ops123',    name: '刘建华', email: 'liu@huitone.com',   roleKey: 'ops_manager' },
+  { username: 'admin',   password: 'admin123',  name: '李少雄', email: 'li.shaoxiong@huitone.com',   roleKey: 'sales_gm' },
+  { username: 'sales',   password: 'sales123',  name: '梁梓柔', email: 'liang.zirou@huitone.com',    roleKey: 'sales_manager' },
+  { username: 'trading', password: 'trade123',  name: '刘海',   email: 'liu.hai@huitone.com',        roleKey: 'trading_director' },
+  { username: 'trader',  password: 'trader123', name: '杜陈傲', email: 'du.chenao@huitone.com',      roleKey: 'trading_manager' },
+  { username: 'ops',     password: 'ops123',    name: '林伟权', email: 'lin.weiquan@huitone.com',    roleKey: 'ops_manager' },
 ];

@@ -10,12 +10,32 @@ export interface Device {
   currentPower: number; // MW，正值放电，负值充电
   location: string;
   lastUpdate: string;
-  soc?: number; // battery state of charge %
+  soc?: number; // 荷电状态 State of Charge %
+  // 设备详细参数
+  connectionType?: string;   // 接入方式
+  batteryType?: string;      // 电池类型
+  batterySpec?: string;      // 电池规格型号
+  bmsModel?: string;         // BMS品牌型号
+  pcsModel?: string;         // PCS品牌型号
+  emsModel?: string;         // EMS品牌
+  investmentCost?: number;   // 投资成本（万元）
+  commissionDate?: string;   // 投运日期
+  warrantyYears?: number;    // 质保年限
+  // 运行健康数据
+  soh?: number;              // 电池健康度 State of Health %
+  cycleCount?: number;       // 累计循环次数
+  maxCellVoltage?: number;   // 单体最高电压 mV
+  minCellVoltage?: number;   // 单体最低电压 mV
+  cellMaxTemp?: number;      // 电芯最高温度 °C
+  cellMinTemp?: number;      // 电芯最低温度 °C
+  temperature?: number;      // 环境温度 °C
+  humidity?: number;         // 环境湿度 %
+  bmsAlarms?: string[];      // BMS告警信息
   // 电网侧储能专属字段
-  station?: string;       // 站点名称
-  projectName?: string;   // 项目全称
-  buildLocation?: string; // 建设地点
-  company?: string;       // 申报公司
+  station?: string;          // 站点名称
+  projectName?: string;      // 项目全称
+  buildLocation?: string;    // 建设地点
+  company?: string;          // 申报公司
 }
 
 export interface DemandResponseTask {
@@ -32,18 +52,7 @@ export interface DemandResponseTask {
 }
 
 export const mockDevices: Device[] = [
-  { id: 'D001', name: '光伏电站-北区', type: '光伏电站', status: '在线', capacity: 50, currentPower: 38.5, location: '北京市朝阳区', lastUpdate: '2026-03-14 10:30:00' },
-  { id: 'D002', name: '储能系统-A', type: '储能系统', status: '在线', capacity: 20, currentPower: 15.2, location: '北京市海淀区', lastUpdate: '2026-03-14 10:30:00', soc: 72 },
-  { id: 'D003', name: '风电场-东区', type: '风电', status: '在线', capacity: 30, currentPower: 22.1, location: '内蒙古呼和浩特', lastUpdate: '2026-03-14 10:30:00' },
-  { id: 'D004', name: '充电桩群-CBD', type: '充电桩', status: '告警', capacity: 5, currentPower: 0, location: '北京市西城区', lastUpdate: '2026-03-14 10:28:00' },
-  { id: 'D005', name: '工业负荷-钢厂', type: '工业负荷', status: '在线', capacity: 40, currentPower: 32.0, location: '河北省唐山市', lastUpdate: '2026-03-14 10:30:00' },
-  { id: 'D006', name: '光伏电站-南区', type: '光伏电站', status: '维护', capacity: 25, currentPower: 0, location: '北京市大兴区', lastUpdate: '2026-03-14 09:00:00' },
-  { id: 'D007', name: '储能系统-B', type: '储能系统', status: '在线', capacity: 15, currentPower: 8.5, location: '天津市滨海新区', lastUpdate: '2026-03-14 10:30:00', soc: 58 },
-  { id: 'D008', name: '风电场-西区', type: '风电', status: '离线', capacity: 20, currentPower: 0, location: '张家口市', lastUpdate: '2026-03-14 08:15:00' },
-  { id: 'D009', name: '充电桩群-园区', type: '充电桩', status: '在线', capacity: 3, currentPower: 1.8, location: '北京市昌平区', lastUpdate: '2026-03-14 10:30:00' },
-  { id: 'D010', name: '工业负荷-化工', type: '工业负荷', status: '在线', capacity: 35, currentPower: 28.5, location: '天津市东丽区', lastUpdate: '2026-03-14 10:30:00' },
-
-  // 电网侧独立储能项目
+  // 电网侧独立储能项目（优先展示）
   {
     id: 'E001', name: '富山站储能', type: '电网储能', status: '在线',
     capacity: 150, energyCapacity: 300, currentPower: 86.4, soc: 65,
@@ -53,6 +62,24 @@ export const mockDevices: Device[] = [
     projectName: '广州市番禺区富山220kV变电站150MW/300MWh新型独立储能项目',
     buildLocation: '广州市番禺区石壁街道东新高速禺山互通起点位置（禺山高架桥79号至禺山桥6号墩范围）',
     company: '广州颐海能源科技有限公司',
+    connectionType: 'IEC61850协议',
+    batteryType: 'LFP磷酸铁锂',
+    batterySpec: '314Ah / 3.2V',
+    bmsModel: '科陆电子 BMS-3000',
+    pcsModel: '阳光电源 SG3125HV',
+    emsModel: '汇图EMS V2.1',
+    investmentCost: 43500,
+    commissionDate: '2025-06-15',
+    warrantyYears: 10,
+    soh: 97,
+    cycleCount: 312,
+    maxCellVoltage: 3284,
+    minCellVoltage: 3271,
+    cellMaxTemp: 31.2,
+    cellMinTemp: 28.5,
+    temperature: 26.3,
+    humidity: 58,
+    bmsAlarms: [],
   },
   {
     id: 'E002', name: '聚龙站储能', type: '电网储能', status: '在线',
@@ -63,6 +90,24 @@ export const mockDevices: Device[] = [
     projectName: '广州市番禺区聚龙220kV变电站150MW/300MWh新型独立储能项目',
     buildLocation: '广州市番禺区石壁街道钟韦路63号',
     company: '广州颐投能源科技有限公司',
+    connectionType: 'IEC61850协议',
+    batteryType: 'LFP磷酸铁锂',
+    batterySpec: '314Ah / 3.2V',
+    bmsModel: '科陆电子 BMS-3000',
+    pcsModel: '阳光电源 SG3125HV',
+    emsModel: '汇图EMS V2.1',
+    investmentCost: 43500,
+    commissionDate: '2025-07-20',
+    warrantyYears: 10,
+    soh: 96,
+    cycleCount: 287,
+    maxCellVoltage: 3291,
+    minCellVoltage: 3268,
+    cellMaxTemp: 30.8,
+    cellMinTemp: 28.1,
+    temperature: 25.8,
+    humidity: 61,
+    bmsAlarms: [],
   },
   {
     id: 'E003', name: '厚德站储能', type: '电网储能', status: '在线',
@@ -73,6 +118,24 @@ export const mockDevices: Device[] = [
     projectName: '广州市海珠区100MW/200MWh新型独立储能项目',
     buildLocation: '广州市海珠区华洲街道土华村"东丫围"（土名）、华南路东侧',
     company: '广州颐滨能源科技有限公司',
+    connectionType: 'IEC61850协议',
+    batteryType: 'LFP磷酸铁锂',
+    batterySpec: '280Ah / 3.2V',
+    bmsModel: '比亚迪 BMS Pro',
+    pcsModel: '华为 SmartPCS2000KL-H',
+    emsModel: '汇图EMS V2.0',
+    investmentCost: 29000,
+    commissionDate: '2025-04-10',
+    warrantyYears: 10,
+    soh: 95,
+    cycleCount: 423,
+    maxCellVoltage: 3301,
+    minCellVoltage: 3262,
+    cellMaxTemp: 32.5,
+    cellMinTemp: 29.3,
+    temperature: 27.1,
+    humidity: 65,
+    bmsAlarms: ['单体温差偏大（3.2°C），建议检查散热风道'],
   },
   {
     id: 'E004', name: '化龙站储能', type: '电网储能', status: '在线',
@@ -83,6 +146,24 @@ export const mockDevices: Device[] = [
     projectName: '广州市番禺区化龙镇100MW/200MWh新型独立储能项目',
     buildLocation: '广州市番禺区化龙镇明经村295县道以南',
     company: '广州颐滨能源科技有限公司',
+    connectionType: 'IEC61850协议',
+    batteryType: 'LFP磷酸铁锂',
+    batterySpec: '280Ah / 3.2V',
+    bmsModel: '比亚迪 BMS Pro',
+    pcsModel: '华为 SmartPCS2000KL-H',
+    emsModel: '汇图EMS V2.0',
+    investmentCost: 29000,
+    commissionDate: '2025-05-18',
+    warrantyYears: 10,
+    soh: 98,
+    cycleCount: 378,
+    maxCellVoltage: 3278,
+    minCellVoltage: 3265,
+    cellMaxTemp: 30.1,
+    cellMinTemp: 27.8,
+    temperature: 24.6,
+    humidity: 55,
+    bmsAlarms: [],
   },
   {
     id: 'E005', name: '科城站储能', type: '电网储能', status: '在线',
@@ -93,6 +174,24 @@ export const mockDevices: Device[] = [
     projectName: '广州市黄埔区新型独立储能（200MW/400MWh）项目',
     buildLocation: '广州市黄埔区联和街道科珠路与南翔一路交叉东南侧',
     company: '广东颐禾能源投资有限公司',
+    connectionType: 'IEC61850协议',
+    batteryType: 'LFP磷酸铁锂',
+    batterySpec: '314Ah / 3.2V',
+    bmsModel: '宁德时代 BESS-BMS',
+    pcsModel: '阳光电源 SG5000HV',
+    emsModel: '汇图EMS V2.1',
+    investmentCost: 58000,
+    commissionDate: '2025-09-01',
+    warrantyYears: 10,
+    soh: 99,
+    cycleCount: 198,
+    maxCellVoltage: 3296,
+    minCellVoltage: 3281,
+    cellMaxTemp: 29.8,
+    cellMinTemp: 27.2,
+    temperature: 25.2,
+    humidity: 52,
+    bmsAlarms: [],
   },
   {
     id: 'E006', name: '鱼飞站储能', type: '电网储能', status: '在线',
@@ -103,6 +202,24 @@ export const mockDevices: Device[] = [
     projectName: '广州市南沙区新型独立储能（150MW/300MWh）项目',
     buildLocation: '广州市南沙区东涌镇马克南街六巷和马发街交叉处',
     company: '广东颐禾能源投资有限公司',
+    connectionType: 'IEC61850协议',
+    batteryType: 'LFP磷酸铁锂',
+    batterySpec: '314Ah / 3.2V',
+    bmsModel: '宁德时代 BESS-BMS',
+    pcsModel: '阳光电源 SG3125HV',
+    emsModel: '汇图EMS V2.1',
+    investmentCost: 43500,
+    commissionDate: '2025-08-12',
+    warrantyYears: 10,
+    soh: 98,
+    cycleCount: 241,
+    maxCellVoltage: 3288,
+    minCellVoltage: 3274,
+    cellMaxTemp: 33.1,
+    cellMinTemp: 30.2,
+    temperature: 28.4,
+    humidity: 69,
+    bmsAlarms: ['环境湿度偏高（69%），建议加强除湿处理'],
   },
   {
     id: 'E007', name: '象山站储能', type: '电网储能', status: '在线',
@@ -113,7 +230,57 @@ export const mockDevices: Device[] = [
     projectName: '深圳市宝安象山200MW/400MWh新型储能项目',
     buildLocation: '深圳市宝安区新桥街道长流陂水库北侧新玉路北侧',
     company: '深圳市颐发能源科技有限公司',
+    connectionType: 'IEC61850协议',
+    batteryType: 'LFP磷酸铁锂',
+    batterySpec: '314Ah / 3.2V',
+    bmsModel: '比亚迪 BMS Pro',
+    pcsModel: '华为 SmartPCS2000KL-H',
+    emsModel: '汇图EMS V2.1',
+    investmentCost: 58000,
+    commissionDate: '2025-10-05',
+    warrantyYears: 10,
+    soh: 99,
+    cycleCount: 163,
+    maxCellVoltage: 3293,
+    minCellVoltage: 3279,
+    cellMaxTemp: 30.4,
+    cellMinTemp: 27.6,
+    temperature: 24.9,
+    humidity: 57,
+    bmsAlarms: [],
   },
+
+  // 其他分布式资源
+  { id: 'D001', name: '光伏电站-北区', type: '光伏电站', status: '在线', capacity: 50, currentPower: 38.5, location: '北京市朝阳区', lastUpdate: '2026-03-14 10:30:00', connectionType: 'MODBUS TCP', commissionDate: '2022-05-01', investmentCost: 15000 },
+  {
+    id: 'D002', name: '储能系统-A', type: '储能系统', status: '在线',
+    capacity: 20, energyCapacity: 40, currentPower: 15.2, location: '北京市海淀区', lastUpdate: '2026-03-14 10:30:00',
+    soc: 72, soh: 88, connectionType: 'MODBUS TCP',
+    batteryType: 'LFP磷酸铁锂', batterySpec: '100Ah / 3.2V',
+    bmsModel: '科陆电子 BMS-2000', pcsModel: '科士达 PCS-200KW', emsModel: '本地EMS',
+    investmentCost: 4800, commissionDate: '2023-11-15', warrantyYears: 5,
+    cycleCount: 892, maxCellVoltage: 3311, minCellVoltage: 3248,
+    cellMaxTemp: 28.6, cellMinTemp: 25.3, temperature: 23.5, humidity: 48,
+    bmsAlarms: ['SOH低于90%，建议安排电池健康诊断'],
+  },
+  { id: 'D003', name: '风电场-东区', type: '风电', status: '在线', capacity: 30, currentPower: 22.1, location: '内蒙古呼和浩特', lastUpdate: '2026-03-14 10:30:00', connectionType: '风机通讯协议', commissionDate: '2021-08-20', investmentCost: 18000 },
+  { id: 'D004', name: '充电桩群-CBD', type: '充电桩', status: '告警', capacity: 5, currentPower: 0, location: '北京市西城区', lastUpdate: '2026-03-14 10:28:00', connectionType: 'OCPP 1.6', commissionDate: '2024-01-10', investmentCost: 800 },
+  { id: 'D005', name: '工业负荷-钢厂', type: '工业负荷', status: '在线', capacity: 40, currentPower: 32.0, location: '河北省唐山市', lastUpdate: '2026-03-14 10:30:00', connectionType: '电表直采', commissionDate: '2023-06-01', investmentCost: 200 },
+  { id: 'D006', name: '光伏电站-南区', type: '光伏电站', status: '维护', capacity: 25, currentPower: 0, location: '北京市大兴区', lastUpdate: '2026-03-14 09:00:00', connectionType: 'MODBUS TCP', commissionDate: '2022-09-15', investmentCost: 7500 },
+  {
+    id: 'D007', name: '储能系统-B', type: '储能系统', status: '在线',
+    capacity: 15, energyCapacity: 30, currentPower: 8.5, location: '天津市滨海新区', lastUpdate: '2026-03-14 10:30:00',
+    soc: 58, soh: 92, connectionType: 'MODBUS TCP',
+    batteryType: 'LFP磷酸铁锂', batterySpec: '100Ah / 3.2V',
+    bmsModel: '科陆电子 BMS-2000', pcsModel: '科士达 PCS-150KW', emsModel: '本地EMS',
+    investmentCost: 3600, commissionDate: '2024-03-20', warrantyYears: 5,
+    cycleCount: 645, maxCellVoltage: 3298, minCellVoltage: 3259,
+    cellMaxTemp: 29.2, cellMinTemp: 26.8, temperature: 24.1, humidity: 51,
+    bmsAlarms: [],
+  },
+  { id: 'D008', name: '风电场-西区', type: '风电', status: '离线', capacity: 20, currentPower: 0, location: '张家口市', lastUpdate: '2026-03-14 08:15:00', connectionType: '风机通讯协议', commissionDate: '2020-12-01', investmentCost: 12000 },
+  { id: 'D009', name: '充电桩群-园区', type: '充电桩', status: '在线', capacity: 3, currentPower: 1.8, location: '北京市昌平区', lastUpdate: '2026-03-14 10:30:00', connectionType: 'OCPP 1.6', commissionDate: '2024-06-01', investmentCost: 480 },
+  { id: 'D010', name: '工业负荷-化工', type: '工业负荷', status: '在线', capacity: 35, currentPower: 28.5, location: '天津市东丽区', lastUpdate: '2026-03-14 10:30:00', connectionType: '电表直采', commissionDate: '2023-09-01', investmentCost: 150 },
 ];
 
 export const mockTasks: DemandResponseTask[] = [
