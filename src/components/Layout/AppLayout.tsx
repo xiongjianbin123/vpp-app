@@ -5,13 +5,15 @@ import {
   DashboardOutlined, ThunderboltOutlined, ApartmentOutlined, DollarOutlined,
   BellOutlined, UserOutlined, LogoutOutlined, SettingOutlined, IdcardOutlined,
   CheckCircleOutlined, WarningOutlined, InfoCircleOutlined, LineChartOutlined,
-  RocketOutlined, SafetyCertificateOutlined,
+  RocketOutlined, SafetyCertificateOutlined, BookOutlined,
 } from '@ant-design/icons';
 import huitoneLogo from '/Huitone-logo.png';
+import { useAuth } from '../../context/AuthContext';
+import { roles } from '../../mock/users';
 
 const { Sider, Header, Content } = Layout;
 
-const menuItems = [
+const allMenuItems = [
   { key: '/', icon: <DashboardOutlined />, label: '监控大屏' },
   { key: '/devices', icon: <ApartmentOutlined />, label: '设备资产' },
   { key: '/demand-response', icon: <ThunderboltOutlined />, label: '需求响应' },
@@ -19,6 +21,7 @@ const menuItems = [
   { key: '/smart-bidding', icon: <RocketOutlined />, label: '智能申报' },
   { key: '/compliance-control', icon: <SafetyCertificateOutlined />, label: 'AGC合规' },
   { key: '/revenue', icon: <DollarOutlined />, label: '收益结算' },
+  { key: '/knowledge', icon: <BookOutlined />, label: '知识库' },
 ];
 
 const pageNames: Record<string, string> = {
@@ -29,6 +32,7 @@ const pageNames: Record<string, string> = {
   '/smart-bidding': '智能申报与收益寻优',
   '/compliance-control': '合规接入与AGC直控监控',
   '/revenue': '收益结算',
+  '/knowledge': '知识库与智能问答',
 };
 
 interface Notice {
@@ -60,7 +64,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [notices, setNotices] = useState<Notice[]>(initialNotices);
   const navigate = useNavigate();
   const location = useLocation();
+  const { user, logout, canAccess } = useAuth();
 
+  const menuItems = allMenuItems.filter(item => canAccess(item.key));
   const unreadCount = notices.filter(n => !n.read).length;
 
   const markAllRead = () => setNotices(prev => prev.map(n => ({ ...n, read: true })));
@@ -85,6 +91,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
       label: <span style={{ color: '#ff4d4d' }}>退出登录</span>,
     },
   ];
+
+  const handleUserMenuClick = ({ key }: { key: string }) => {
+    if (key === 'logout') {
+      logout();
+      navigate('/login');
+    }
+  };
+
+  const roleLabel = user ? roles[user.roleKey].label : '';
 
   return (
     <Layout style={{ minHeight: '100vh', background: '#0a0e1a' }}>
@@ -177,6 +192,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <Dropdown
               menu={{
                 items: userMenuItems,
+                onClick: handleUserMenuClick,
                 style: {
                   background: '#1a2540',
                   border: '1px solid rgba(0,212,255,0.2)',
@@ -194,8 +210,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                   style={{ background: 'rgba(0,212,255,0.15)', border: '1px solid rgba(0,212,255,0.4)' }}
                 />
                 <div style={{ lineHeight: 1.2 }}>
-                  <div style={{ color: '#e2e8f0', fontSize: 13, fontWeight: 500 }}>运营管理员</div>
-                  <div style={{ color: '#4a6080', fontSize: 11 }}>admin@huitone.com</div>
+                  <div style={{ color: '#e2e8f0', fontSize: 13, fontWeight: 500 }}>{user?.name ?? '未登录'}</div>
+                  <div style={{ color: '#4a6080', fontSize: 11 }}>{roleLabel}</div>
                 </div>
               </div>
             </Dropdown>
