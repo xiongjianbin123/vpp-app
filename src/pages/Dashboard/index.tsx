@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Row, Col, Card, Alert, List, Tag } from 'antd';
+import { Row, Col, Card, Alert, List, Tag, Button } from 'antd';
 import {
   LineChart, Line, AreaChart, Area, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
@@ -7,7 +7,9 @@ import {
 import { generate24hData } from '../../mock/data';
 import {
   ArrowUpOutlined, ArrowDownOutlined, WarningOutlined, CheckCircleOutlined,
+  RobotOutlined,
 } from '@ant-design/icons';
+import AIAssistant, { SUGGESTED_QUESTIONS } from '../../components/AIAssistant';
 
 const COLORS = ['#00d4ff', '#00ff88', '#ffb800', '#ff6b6b'];
 
@@ -60,6 +62,7 @@ export default function Dashboard() {
   const [freqData, setFreqData] = useState(generateFreqData());
   const [currentPower, setCurrentPower] = useState(128.5);
   const [lastUpdate, setLastUpdate] = useState(new Date());
+  const [aiOpen, setAiOpen] = useState(false);
 
   useEffect(() => {
     const interval = setInterval(() => {
@@ -91,14 +94,28 @@ export default function Dashboard() {
             数据每3秒自动刷新 · 最后更新：{lastUpdate.toLocaleTimeString('zh-CN')}
           </p>
         </div>
-        {activeAlerts.length > 0 && (
-          <Alert
-            message={`当前 ${activeAlerts.length} 条未处理告警`}
-            type="warning"
-            showIcon
-            style={{ background: 'rgba(255,184,0,0.08)', border: '1px solid rgba(255,184,0,0.3)', color: '#ffb800', borderRadius: 8 }}
-          />
-        )}
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+          {activeAlerts.length > 0 && (
+            <Alert
+              message={`当前 ${activeAlerts.length} 条未处理告警`}
+              type="warning"
+              showIcon
+              style={{ background: 'rgba(255,184,0,0.08)', border: '1px solid rgba(255,184,0,0.3)', color: '#ffb800', borderRadius: 8 }}
+            />
+          )}
+          <Button
+            icon={<RobotOutlined />}
+            onClick={() => setAiOpen(true)}
+            style={{
+              background: 'linear-gradient(135deg, rgba(0,212,255,0.15), rgba(0,255,136,0.1))',
+              border: '1px solid rgba(0,212,255,0.4)',
+              color: '#00d4ff', borderRadius: 8, fontWeight: 600,
+              boxShadow: '0 0 12px rgba(0,212,255,0.2)',
+            }}
+          >
+            智能问数
+          </Button>
+        </div>
       </div>
 
       {/* KPI Cards */}
@@ -255,6 +272,50 @@ export default function Dashboard() {
           </Card>
         </Col>
 
+        {/* AI 智能问数入口卡片 */}
+        <Col xs={24} md={16}>
+          <Card
+            style={{
+              background: 'linear-gradient(135deg, rgba(0,212,255,0.06), rgba(0,255,136,0.04))',
+              border: '1px solid rgba(0,212,255,0.25)',
+              borderRadius: 12, cursor: 'pointer',
+            }}
+            styles={{ body: { padding: '16px 20px' } }}
+            onClick={() => setAiOpen(true)}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+                <div style={{
+                  width: 44, height: 44, borderRadius: 12,
+                  background: 'linear-gradient(135deg, rgba(0,212,255,0.25), rgba(0,255,136,0.15))',
+                  border: '1px solid rgba(0,212,255,0.4)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  boxShadow: '0 0 16px rgba(0,212,255,0.2)',
+                }}>
+                  <RobotOutlined style={{ color: '#00d4ff', fontSize: 22 }} />
+                </div>
+                <div>
+                  <div style={{ color: '#00d4ff', fontSize: 15, fontWeight: 700 }}>AI 智能问数</div>
+                  <div style={{ color: '#4a6080', fontSize: 12, marginTop: 2 }}>
+                    用自然语言查询任意运营数据，支持图表可视化
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {SUGGESTED_QUESTIONS.slice(0, 3).map(q => (
+                  <div key={q} style={{
+                    background: 'rgba(0,212,255,0.08)', border: '1px solid rgba(0,212,255,0.15)',
+                    borderRadius: 6, padding: '3px 10px', color: '#6b7280', fontSize: 11,
+                  }}>
+                    {q}
+                  </div>
+                ))}
+                <div style={{ color: '#4a6080', fontSize: 11, textAlign: 'right' }}>点击展开 →</div>
+              </div>
+            </div>
+          </Card>
+        </Col>
+
         {/* Device Status + Grid Freq */}
         <Col xs={24} md={16}>
           <Row gutter={[16, 16]}>
@@ -330,6 +391,8 @@ export default function Dashboard() {
           </Row>
         </Col>
       </Row>
+
+      <AIAssistant open={aiOpen} onClose={() => setAiOpen(false)} />
     </div>
   );
 }
