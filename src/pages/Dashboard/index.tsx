@@ -4,26 +4,33 @@ import {
   LineChart, Line, AreaChart, Area, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
-import { generate24hData } from '../../mock/data';
+import { generate24hData, mockDevices } from '../../mock/data';
 import {
   ArrowUpOutlined, ArrowDownOutlined, WarningOutlined, CheckCircleOutlined,
   RobotOutlined,
 } from '@ant-design/icons';
 import AIAssistant, { SUGGESTED_QUESTIONS } from '../../components/AIAssistant';
 
-const COLORS = ['#00d4ff', '#00ff88', '#ffb800', '#ff6b6b'];
+const COLORS = ['#38bdf8', '#00d4ff', '#ffb800', '#00ff88', '#a78bfa'];
 
+// 按实际装机容量动态计算能源结构
 const energyPie = [
-  { name: '光伏', value: 38.5 },
-  { name: '储能', value: 23.7 },
-  { name: '风电', value: 22.1 },
-  { name: '柔性负荷', value: 44.2 },
+  { name: '电网侧储能', value: mockDevices.filter(d => d.type === '电网储能').reduce((s, d) => s + d.capacity, 0) },
+  { name: '工商业储能', value: mockDevices.filter(d => d.type === '储能系统').reduce((s, d) => s + d.capacity, 0) },
+  { name: '光伏', value: mockDevices.filter(d => d.type === '光伏电站').reduce((s, d) => s + d.capacity, 0) },
+  { name: '风电', value: mockDevices.filter(d => d.type === '风电').reduce((s, d) => s + d.capacity, 0) },
+  { name: '柔性负荷', value: mockDevices.filter(d => d.type === '充电桩' || d.type === '工业负荷').reduce((s, d) => s + d.capacity, 0) },
 ];
 
+const totalCapacity = mockDevices.reduce((s, d) => s + d.capacity, 0);
+const totalCurrentPower = Math.round(mockDevices.filter(d => d.status === '在线').reduce((s, d) => s + d.currentPower, 0) * 10) / 10;
+const onlineCount = mockDevices.filter(d => d.status === '在线').length;
+
 const deviceStatus = [
-  { name: '在线', value: 7, color: '#00ff88' },
-  { name: '离线', value: 2, color: '#4a5568' },
-  { name: '告警', value: 1, color: '#ff4d4d' },
+  { name: '在线', value: mockDevices.filter(d => d.status === '在线').length, color: '#00ff88' },
+  { name: '维护', value: mockDevices.filter(d => d.status === '维护').length, color: '#ffb800' },
+  { name: '告警', value: mockDevices.filter(d => d.status === '告警').length, color: '#ff4d4d' },
+  { name: '离线', value: mockDevices.filter(d => d.status === '离线').length, color: '#4a5568' },
 ];
 
 const alerts = [
@@ -60,7 +67,7 @@ function generateFreqData() {
 export default function Dashboard() {
   const [powerData] = useState(generate24hData());
   const [freqData, setFreqData] = useState(generateFreqData());
-  const [currentPower, setCurrentPower] = useState(128.5);
+  const [currentPower, setCurrentPower] = useState(totalCurrentPower);
   const [lastUpdate, setLastUpdate] = useState(new Date());
   const [aiOpen, setAiOpen] = useState(false);
 
@@ -74,11 +81,11 @@ export default function Dashboard() {
   }, []);
 
   const kpiCards: KpiCard[] = [
-    { title: '总装机容量', value: 243, unit: 'MW', color: '#00d4ff', trend: 0 },
-    { title: '在线设备', value: 7, unit: '台', color: '#00ff88', trend: -1 },
-    { title: '当前发电功率', value: currentPower, unit: 'MW', color: '#00d4ff', trend: 2.3, dynamic: true },
-    { title: '今日发电量', value: 1842.6, unit: 'MWh', color: '#ffb800', trend: 5.7 },
-    { title: '碳减排量', value: 921.3, unit: 'tCO₂', color: '#00ff88', trend: 5.7 },
+    { title: '总装机容量', value: totalCapacity, unit: 'MW', color: '#00d4ff', trend: 0 },
+    { title: '在线设备', value: onlineCount, unit: '台', color: '#00ff88', trend: -1 },
+    { title: '当前出力功率', value: currentPower, unit: 'MW', color: '#00d4ff', trend: 2.3, dynamic: true },
+    { title: '今日发电量', value: 7842.6, unit: 'MWh', color: '#ffb800', trend: 5.7 },
+    { title: '碳减排量', value: 3921.3, unit: 'tCO₂', color: '#00ff88', trend: 5.7 },
   ];
 
   const activeAlerts = alerts.filter(a => a.active);
