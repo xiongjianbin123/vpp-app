@@ -164,25 +164,30 @@ function computeAnnualRevenue(cfg: InvestmentConfig, year: number): number {
   let rev = 0;
 
   if (models.includes('peakValley')) {
-    rev += cfg.ratedCapacity * eff * cfg.peakValleySpread * cfg.dailyCycles * 365 / 10000 * deg;
+    // ratedCapacity(MWh) × 1000 → kWh, × spread(元/kWh) → 元, ÷ 10000 → 万
+    rev += cfg.ratedCapacity * 1000 * eff * cfg.peakValleySpread * cfg.dailyCycles * 365 / 10000 * deg;
   }
   if (models.includes('spotArbitrage')) {
-    rev += cfg.ratedCapacity * eff * cfg.spotSpread * cfg.dailyCycles * 365 / 10000 * deg;
+    rev += cfg.ratedCapacity * 1000 * eff * cfg.spotSpread * cfg.dailyCycles * 365 / 10000 * deg;
   }
   if (models.includes('frequency')) {
+    // ratedPower(MW) × mileage(MWh/MW/day) × price(元/MWh) × 365 ÷ 10000 → 万
     rev += cfg.ratedPower * cfg.frequencyMileage * cfg.frequencyMileagePrice * cfg.kValue * 365 / 10000 * deg;
   }
   if (models.includes('peakReg')) {
+    // ratedPower(MW) × price(元/MW·h) × hours ÷ 10000 → 万
     rev += cfg.ratedPower * cfg.peakRegPrice * cfg.peakRegHours * (cfg.peakRegUtilization / 100) / 10000 * deg;
   }
   if (models.includes('capacityLease')) {
     rev += cfg.ratedPower * cfg.capacityLeasePerMW;
   }
   if (models.includes('demandResponse')) {
-    rev += cfg.ratedPower * 0.5 * 365 * 0.15 / 10000 * deg; // 简化: 0.15元/kWh响应补贴
+    // ratedPower(MW) × 1000 → kW, × 响应电量(kWh/kW/年) × 补贴(元/kWh) ÷ 10000 → 万
+    rev += cfg.ratedPower * 1000 * 20 * 0.3 / 10000 * deg; // 年均响应20次×1h×0.3元/kWh补贴
   }
   if (models.includes('capacityFee')) {
-    rev += cfg.ratedPower * 40 * 12 / 10000; // 节省容量电费约40元/kW/月
+    // ratedPower(MW) × 1000 → kW, × 需量电费(元/kW/月) × 12 ÷ 10000 → 万
+    rev += cfg.ratedPower * 1000 * 40 * 12 / 10000;
   }
 
   return +rev.toFixed(4);
@@ -376,10 +381,7 @@ export default function InvestmentCalculator() {
     setCfg(prev => ({ ...prev, [key]: val }));
 
   const results = useMemo(() => calculateAll(cfg), [cfg]);
-  const sensitivity = useMemo(
-    () => activeTab === '9' ? computeSensitivity(cfg) : null,
-    [cfg, activeTab]
-  );
+  const sensitivity = useMemo(() => computeSensitivity(cfg), [cfg]);
 
   const autoTotalInv = results.totalInvestment;
 
@@ -866,122 +868,145 @@ export default function InvestmentCalculator() {
     );
   };
 
+  // ─── Tab8：投资回报汇总 ────────────────────────────────────────────────────
+  const totalRevenue = results.yearlyRows.reduce((s, r) => s + r.revenue, 0);
+  const totalCost = results.yearlyRows.reduce((s, r) => s + r.opex + r.debtService, 0);
+  const totalNCF = results.yearlyRows.reduce((s, r) => s + r.netCashFlow, 0);
+  const avgRevenue = totalRevenue / cfg.calcPeriod;
+
+  const summaryTableData = [
+    { key: 'inv', label: '项目总投资', value: `¥${autoTotalInv.toFixed(2)} 万元`, highlight: false },
+    { key: 'eq', label: '资本金（自有资金）', value: `¥${(autoTotalInv * cfg.equityRatio / 100).toFixed(2)} 万元（${cfg.equityRatio}%）`, highlight: false },
+    { key: 'debt', label: '银行贷款', value: `¥${(autoTotalInv * (1 - cfg.equityRatio / 100)).toFixed(2)} 万元（${100 - cfg.equityRatio}%）`, highlight: false },
+    { key: 'cap', label: '储能规模', value: `${cfg.ratedCapacity} MWh / ${cfg.ratedPower} MW`, highlight: false },
+    { key: 'model', label: '盈利模式', value: (cfg.storageType === 'commercial' ? COMMERCIAL_MODELS : GRID_MODELS).filter(m => cfg.selectedModels.includes(m.value)).map(m => m.label).join('、'), highlight: false },
+    { key: 'avgrev', label: '年均收益', value: `¥${avgRevenue.toFixed(2)} 万元/年`, highlight: true },
+    { key: 'totalrev', label: `计算期（${cfg.calcPeriod}年）累计收益`, value: `¥${totalRevenue.toFixed(2)} 万元`, highlight: true },
+    { key: 'totalcost', label: `计算期累计成本（运维+还贷）`, value: `¥${totalCost.toFixed(2)} 万元`, highlight: false },
+    { key: 'totalncf', label: '计算期净现金流合计', value: `¥${totalNCF.toFixed(2)} 万元`, highlight: true },
+    { key: 'npv', label: 'NPV（净现值）', value: isNaN(results.npv) ? '-' : `¥${results.npv.toFixed(2)} 万元`, highlight: true },
+    { key: 'irr', label: 'IRR（内部收益率）', value: isNaN(results.irr) ? '-' : `${results.irr}%（基准 ${cfg.benchmarkRate}%）`, highlight: true },
+    { key: 'sp', label: '静态投资回收期', value: isFinite(results.staticPayback) ? `${results.staticPayback.toFixed(1)} 年` : '超出计算期', highlight: false },
+    { key: 'dp', label: '动态投资回收期', value: isFinite(results.dynamicPayback) ? `${results.dynamicPayback} 年` : '超出计算期', highlight: false },
+    { key: 'roi', label: '总投资收益率（年均）', value: `${results.roi.toFixed(1)}%`, highlight: false },
+    { key: 'eroi', label: '资本金收益率（年均）', value: `${results.equityROI.toFixed(1)}%`, highlight: false },
+    { key: 'rating', label: '综合评价', value: irrLabel[irrRating], highlight: true },
+  ];
+
   const Tab8 = (
     <Row gutter={[16, 16]}>
+      {/* 顶部 KPI 卡片 */}
       <Col span={24}>
         <Row gutter={[12, 12]}>
           {[
-            {
-              label: 'NPV 净现值',
-              value: isNaN(results.npv) ? '-' : `¥${results.npv.toFixed(2)}`,
-              unit: '万元',
-              color: results.npv >= 0 ? '#00ff88' : '#ff4d4d',
-              tip: 'NPV > 0 表示项目在设定折现率下可盈利',
-            },
-            {
-              label: 'IRR 内部收益率',
-              value: isNaN(results.irr) ? '-' : `${results.irr}%`,
-              unit: `基准 ${cfg.benchmarkRate}%`,
-              color: irrColor[irrRating],
-              tip: `IRR > 基准收益率 ${cfg.benchmarkRate}% 视为项目可行`,
-            },
-            {
-              label: '静态回收期',
-              value: isFinite(results.staticPayback) ? `${results.staticPayback.toFixed(1)}` : '超出计算期',
-              unit: '年',
-              color: isFinite(results.staticPayback) && results.staticPayback <= cfg.calcPeriod ? '#00d4ff' : '#ff4d4d',
-              tip: '不考虑资金时间价值的投资回收期',
-            },
-            {
-              label: '动态回收期',
-              value: isFinite(results.dynamicPayback) ? `${results.dynamicPayback}` : '超出计算期',
-              unit: '年',
-              color: isFinite(results.dynamicPayback) && results.dynamicPayback <= cfg.calcPeriod ? '#00d4ff' : '#ff4d4d',
-              tip: '考虑折现后的投资回收期',
-            },
-            {
-              label: '总投资收益率',
-              value: `${results.roi.toFixed(1)}%`,
-              unit: '年均',
-              color: '#a78bfa',
-              tip: '年均收益 / 总投资',
-            },
-            {
-              label: '资本金收益率',
-              value: `${results.equityROI.toFixed(1)}%`,
-              unit: '年均',
-              color: '#38bdf8',
-              tip: '年均收益 / 资本金',
-            },
+            { label: 'NPV 净现值', value: isNaN(results.npv) ? '-' : `¥${results.npv.toFixed(1)}万`, color: results.npv >= 0 ? '#00ff88' : '#ff4d4d', tip: 'NPV > 0 表示项目在设定折现率下可盈利' },
+            { label: 'IRR 内部收益率', value: isNaN(results.irr) ? '-' : `${results.irr}%`, color: irrColor[irrRating], tip: `IRR > 基准 ${cfg.benchmarkRate}% 视为项目可行` },
+            { label: '静态回收期', value: isFinite(results.staticPayback) ? `${results.staticPayback.toFixed(1)}年` : '超期', color: isFinite(results.staticPayback) && results.staticPayback <= cfg.calcPeriod ? '#00d4ff' : '#ff4d4d', tip: '不考虑资金时间价值的回收期' },
+            { label: '动态回收期', value: isFinite(results.dynamicPayback) ? `${results.dynamicPayback}年` : '超期', color: isFinite(results.dynamicPayback) && results.dynamicPayback <= cfg.calcPeriod ? '#00d4ff' : '#ff4d4d', tip: '折现后的投资回收期' },
+            { label: '年均收益', value: `¥${avgRevenue.toFixed(1)}万`, color: '#00ff88', tip: `计算期 ${cfg.calcPeriod} 年年均收益` },
+            { label: '总投资收益率', value: `${results.roi.toFixed(1)}%`, color: '#a78bfa', tip: '年均收益 / 总投资' },
           ].map(item => (
             <Col key={item.label} span={4}>
-              <Card style={cardStyle} styles={{ body: { padding: '16px 18px' } }}>
+              <Card style={cardStyle} styles={{ body: { padding: '14px 16px' } }}>
                 <Tooltip title={item.tip}>
                   <div style={{ color: '#4a6080', fontSize: 11, marginBottom: 4, cursor: 'help' }}>
                     {item.label} <InfoCircleOutlined style={{ fontSize: 10 }} />
                   </div>
                 </Tooltip>
-                <div style={{ color: item.color, fontSize: 22, fontWeight: 700, fontFamily: 'monospace' }}>
-                  {item.value}
-                </div>
-                <div style={{ color: '#4a6080', fontSize: 11, marginTop: 2 }}>{item.unit}</div>
+                <div style={{ color: item.color, fontSize: 20, fontWeight: 700, fontFamily: 'monospace' }}>{item.value}</div>
               </Card>
             </Col>
           ))}
         </Row>
       </Col>
 
-      {/* 评级结果 */}
-      <Col span={8}>
+      {/* 综合评价徽章 + 项目概况汇总表 */}
+      <Col span={6}>
         <Card style={cardStyle} styles={{ header: headStyle }} title={<span style={{ color: '#00d4ff' }}>综合评价</span>}>
-          <div style={{ textAlign: 'center', padding: '20px 0' }}>
+          <div style={{ textAlign: 'center', padding: '16px 0 12px' }}>
             <div style={{
-              width: 100, height: 100, borderRadius: '50%', margin: '0 auto 16px',
-              background: `${irrColor[irrRating]}20`,
-              border: `3px solid ${irrColor[irrRating]}`,
+              width: 90, height: 90, borderRadius: '50%', margin: '0 auto 12px',
+              background: `${irrColor[irrRating]}20`, border: `3px solid ${irrColor[irrRating]}`,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
-              fontSize: 28, fontWeight: 700, color: irrColor[irrRating],
+              fontSize: 24, fontWeight: 700, color: irrColor[irrRating],
             }}>
               {irrLabel[irrRating]}
             </div>
-            <div style={{ color: '#aab4c8', fontSize: 13 }}>
-              {irrRating === 'excellent' && `IRR ${results.irr}% 显著高于基准，项目经济性优秀`}
-              {irrRating === 'pass' && `IRR ${results.irr}% ≥ 基准 ${cfg.benchmarkRate}%，项目可行`}
-              {irrRating === 'marginal' && `IRR ${results.irr}% 略低于基准，项目回收期较长`}
-              {irrRating === 'fail' && `IRR ${isNaN(results.irr) ? '-' : results.irr + '%'} 低于基准，建议优化参数`}
-              {irrRating === 'na' && '收益不足以覆盖投资，请检查参数设置'}
+            <div style={{ color: '#aab4c8', fontSize: 12 }}>
+              {irrRating === 'excellent' && `IRR ${results.irr}% 远高于基准`}
+              {irrRating === 'pass' && `IRR ${results.irr}% ≥ 基准 ${cfg.benchmarkRate}%`}
+              {irrRating === 'marginal' && `IRR ${results.irr}% 略低于基准`}
+              {irrRating === 'fail' && `IRR 低于基准，建议优化参数`}
+              {irrRating === 'na' && '收益不足以覆盖投资'}
             </div>
           </div>
-          <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 12, fontSize: 12 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-              <span style={{ color: '#4a6080' }}>总投资</span>
-              <span style={{ color: '#e2e8f0' }}>¥{autoTotalInv} 万元</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-              <span style={{ color: '#4a6080' }}>计算期累计净收益</span>
-              <span style={{ color: '#00ff88' }}>¥{(results.yearlyRows.reduce((s, r) => s + r.netCashFlow, 0) + autoTotalInv).toFixed(1)} 万元</span>
-            </div>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <span style={{ color: '#4a6080' }}>项目净收益</span>
-              <span style={{ color: results.npv >= 0 ? '#00ff88' : '#ff4d4d' }}>¥{results.npv.toFixed(1)} 万元（NPV）</span>
-            </div>
+          <div style={{ borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 10, fontSize: 12 }}>
+            {[
+              { label: '总投资', val: `¥${autoTotalInv}万` },
+              { label: '期末累计净CF', val: `¥${totalNCF.toFixed(1)}万`, color: totalNCF >= 0 ? '#00ff88' : '#ff4d4d' },
+              { label: '项目 NPV', val: `¥${isNaN(results.npv) ? '-' : results.npv.toFixed(1)}万`, color: results.npv >= 0 ? '#00ff88' : '#ff4d4d' },
+            ].map(r => (
+              <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
+                <span style={{ color: '#4a6080' }}>{r.label}</span>
+                <span style={{ color: r.color ?? '#e2e8f0', fontWeight: 600 }}>{r.val}</span>
+              </div>
+            ))}
           </div>
         </Card>
       </Col>
 
-      <Col span={16}>
-        <Card style={cardStyle} styles={{ header: headStyle }} title={<span style={{ color: '#00d4ff' }}>年度收益 vs 成本</span>}>
-          <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={results.yearlyRows.slice(0, 10)} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
+      {/* 投资回报汇总表格 */}
+      <Col span={18}>
+        <Card style={cardStyle} styles={{ header: headStyle }} title={<span style={{ color: '#00d4ff' }}>投资回报汇总表</span>}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <tbody>
+              {summaryTableData.map((row, i) => (
+                <tr key={row.key} style={{ background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)' }}>
+                  <td style={{ padding: '8px 16px', color: '#6b7280', width: '45%', borderBottom: '1px solid rgba(255,255,255,0.04)', whiteSpace: 'nowrap' }}>
+                    {row.label}
+                  </td>
+                  <td style={{ padding: '8px 16px', borderBottom: '1px solid rgba(255,255,255,0.04)', fontWeight: row.highlight ? 600 : 400 }}>
+                    <span style={{ color: row.highlight ? '#00d4ff' : '#e2e8f0' }}>{row.value}</span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </Card>
+      </Col>
+
+      {/* 年度收益 vs 成本 柱状图 */}
+      <Col span={12}>
+        <Card style={cardStyle} styles={{ header: headStyle }} title={<span style={{ color: '#00d4ff' }}>逐年收益与成本对比</span>}>
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart data={results.yearlyRows} margin={{ top: 10, right: 16, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-              <XAxis dataKey="year" stroke="#4a6080" tick={{ fontSize: 10 }} />
+              <XAxis dataKey="year" stroke="#4a6080" tick={{ fontSize: 9 }} interval={Math.floor(cfg.calcPeriod / 6)} />
               <YAxis stroke="#4a6080" tick={{ fontSize: 11 }} unit="万" />
               <RTooltip contentStyle={tooltipStyle} formatter={(v: unknown) => [`¥${Number(v).toFixed(1)}万`, '']} />
-              <Legend />
-              <Bar dataKey="revenue" name="年收益" fill="#00ff88" stackId="a" />
-              <Bar dataKey="opex" name="运维成本" fill="#ffb800" stackId="b" />
-              <Bar dataKey="debtService" name="还贷支出" fill="#ff4d4d" stackId="b" />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Bar dataKey="revenue" name="年收益" fill="#00ff88" radius={[3, 3, 0, 0]} />
+              <Bar dataKey="opex" name="运维成本" fill="#ffb800" stackId="cost" />
+              <Bar dataKey="debtService" name="还贷支出" fill="#ff4d4d" stackId="cost" radius={[3, 3, 0, 0]} />
             </BarChart>
+          </ResponsiveContainer>
+        </Card>
+      </Col>
+
+      {/* 累计现金流折线图 */}
+      <Col span={12}>
+        <Card style={cardStyle} styles={{ header: headStyle }} title={<span style={{ color: '#00d4ff' }}>累计现金流曲线（含回收期判断）</span>}>
+          <ResponsiveContainer width="100%" height={260}>
+            <LineChart data={results.yearlyRows} margin={{ top: 10, right: 16, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+              <XAxis dataKey="year" stroke="#4a6080" tick={{ fontSize: 9 }} interval={Math.floor(cfg.calcPeriod / 6)} />
+              <YAxis stroke="#4a6080" tick={{ fontSize: 11 }} unit="万" />
+              <RTooltip contentStyle={tooltipStyle} formatter={(v: unknown) => [`¥${Number(v).toFixed(1)}万`, '']} />
+              <ReferenceLine y={0} stroke="#ffb800" strokeDasharray="4 4" label={{ value: '回收', fill: '#ffb800', fontSize: 10, position: 'insideRight' }} />
+              <Legend wrapperStyle={{ fontSize: 11 }} />
+              <Line type="monotone" dataKey="cumulativeCF" name="累计净现金流" stroke="#00d4ff" strokeWidth={2} dot={false} />
+              <Line type="monotone" dataKey="cumulativeDiscountedCF" name="累计折现现金流" stroke="#00ff88" strokeWidth={2} dot={false} strokeDasharray="5 3" />
+            </LineChart>
           </ResponsiveContainer>
         </Card>
       </Col>
@@ -989,7 +1014,6 @@ export default function InvestmentCalculator() {
   );
 
   const Tab9 = () => {
-    if (!sensitivity) return <div style={{ color: '#4a6080', textAlign: 'center', padding: 40 }}>正在计算...</div>;
 
     const sensColumns: ColumnType<SensitivityRow>[] = [
       { title: '参数', dataIndex: 'parameter', width: 130 },
@@ -1093,7 +1117,7 @@ export default function InvestmentCalculator() {
             { key: '5', label: '电池相关参数', children: Tab5 },
             { key: '6', label: '成本与费用', children: Tab6 },
             { key: '7', label: '收益测算', children: <Tab7 /> },
-            { key: '8', label: '财务评价指标', children: Tab8 },
+            { key: '8', label: '投资回报汇总', children: Tab8 },
             { key: '9', label: '敏感性分析', children: <Tab9 /> },
           ]}
         />
