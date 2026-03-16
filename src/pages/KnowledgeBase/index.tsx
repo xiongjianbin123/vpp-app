@@ -10,7 +10,9 @@ import {
   CheckCircleOutlined, SyncOutlined, CloseCircleOutlined,
   BookOutlined,
 } from '@ant-design/icons';
-import Anthropic from '@anthropic-ai/sdk';
+import { streamAI, loadAIConfig, AI_PROVIDERS } from '../../services/aiService';
+import type { AIConfig } from '../../services/aiService';
+import AIModelSelector from '../../components/AIModelSelector';
 import { mockNews } from '../../mock/data';
 import type { NewsItem } from '../../mock/data';
 import { generateMockExcerpt, generateMockTags } from '../../mock/data';
@@ -171,42 +173,6 @@ function buildMockResponse(q: string, docs: KnowledgeDoc[], news: NewsItem[]): s
   return `您好！我是汇图能源VPP知识库助手。\n\n当前知识库状态：\n- 已索引文档：**${indexed.length}** 份\n- 今日市场资讯：**${news.length}** 条\n\n您可以询问：\n- 今日电力市场新闻动态\n- 已上传文档的具体内容\n- 电力交易政策法规咨询\n- K值、AGC、现货市场等专业问题\n\n如需接入真实 Claude AI 以获得更准确的回答，请点击右上角 🔑 配置 API Key。`;
 }
 
-// ─── API Key Modal ────────────────────────────────────────────────────────────
-
-function ApiKeyModal({ open, onClose, apiKey, onSave }: {
-  open: boolean; onClose: () => void;
-  apiKey: string; onSave: (k: string) => void;
-}) {
-  const [val, setVal] = useState(apiKey);
-  return (
-    <Modal
-      open={open}
-      onCancel={onClose}
-      onOk={() => { onSave(val); onClose(); }}
-      title={<span style={{ color: '#00d4ff' }}>配置 Claude API Key</span>}
-      styles={{ body: { background: '#1a2540' }, header: { background: '#1a2540' } }}
-    >
-      <p style={{ color: '#aab4c8', fontSize: 12, marginBottom: 12 }}>
-        API Key 仅存储于本地浏览器，不会上传服务器。获取地址：console.anthropic.com
-      </p>
-      <Input.Password
-        value={val}
-        onChange={e => setVal(e.target.value)}
-        placeholder="sk-ant-..."
-        style={{ background: '#0d1526', border: '1px solid rgba(0,212,255,0.2)', color: '#e2e8f0' }}
-      />
-      {apiKey && (
-        <Button
-          danger size="small" style={{ marginTop: 8 }}
-          onClick={() => { setVal(''); onSave(''); onClose(); }}
-        >
-          清除 Key
-        </Button>
-      )}
-    </Modal>
-  );
-}
-
 // ─── Main Component ────────────────────────────────────────────────────────────
 
 const cardStyle: React.CSSProperties = {
@@ -232,7 +198,7 @@ export default function KnowledgeBase() {
   const [messages, setMessages] = useState<QAMessage[]>([]);
   const [input, setInput] = useState('');
   const [thinking, setThinking] = useState(false);
-  const [apiKey, setApiKey] = useState(() => localStorage.getItem('vpp_claude_key') ?? '');
+  const [aiConfig, setAiConfig] = useState<AIConfig>(() => loadAIConfig());
   const [keyModalOpen, setKeyModalOpen] = useState(false);
   const msgEndRef = useRef<HTMLDivElement>(null);
 
@@ -252,12 +218,6 @@ export default function KnowledgeBase() {
   useEffect(() => {
     msgEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
-
-  const handleSaveKey = (k: string) => {
-    setApiKey(k);
-    if (k) localStorage.setItem('vpp_claude_key', k);
-    else localStorage.removeItem('vpp_claude_key');
-  };
 
   // ── Document Upload ──────────────────────────────────────────────────────────
 
@@ -320,47 +280,32 @@ export default function KnowledgeBase() {
     };
     setMessages(prev => [...prev, userMsg, assistantMsg]);
 
-    if (apiKey) {
-      let mounted = true;
+    if (aiConfig.apiKey) {
+      const historyMessages = messages
+        .filter(m => !m.streaming)
+        .map(m => ({ role: m.role as 'user' | 'assistant', content: m.text }));
+      historyMessages.push({ role: 'user', content: text.trim() });
+
       try {
-        const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true });
-        const stream = client.messages.stream({
-          model: 'claude-haiku-4-5-20251001',
-          max_tokens: 1024,
-          system: buildSystemPrompt(docs, news),
-          messages: [
-            ...messages.filter(m => !m.streaming).map(m => ({
-              role: m.role as 'user' | 'assistant',
-              content: m.text,
-            })),
-            { role: 'user' as const, content: text.trim() },
-          ],
-        });
         let fullText = '';
-        stream.on('text', chunk => {
-          if (!mounted) return;
+        for await (const chunk of streamAI(aiConfig, buildSystemPrompt(docs, news), historyMessages)) {
           fullText += chunk;
           setMessages(prev => prev.map(m =>
             m.id === assistantId ? { ...m, text: fullText } : m
           ));
-        });
-        await stream.finalMessage();
-        if (mounted) {
-          setMessages(prev => prev.map(m =>
-            m.id === assistantId ? { ...m, streaming: false } : m
-          ));
         }
+        setMessages(prev => prev.map(m =>
+          m.id === assistantId ? { ...m, streaming: false } : m
+        ));
       } catch (err) {
-        if (mounted) {
-          const errText = err instanceof Error ? err.message : '请求失败';
-          setMessages(prev => prev.map(m =>
-            m.id === assistantId ? { ...m, text: `⚠️ API 请求失败：${errText}`, streaming: false } : m
-          ));
-        }
+        const errText = err instanceof Error ? err.message : '请求失败';
+        setMessages(prev => prev.map(m =>
+          m.id === assistantId ? { ...m, text: `⚠️ API 请求失败：${errText}`, streaming: false } : m
+        ));
       } finally {
-        if (mounted) setThinking(false);
+        setThinking(false);
       }
-      return () => { mounted = false; };
+      return;
     } else {
       // Mock fallback
       await new Promise(r => setTimeout(r, 600 + Math.random() * 400));
@@ -579,18 +524,18 @@ export default function KnowledgeBase() {
                   <BookOutlined style={{ marginRight: 6 }} />
                   智能问答
                 </span>
-                <Tooltip title={apiKey ? `已配置 Key: ${apiKey.slice(0, 12)}...` : '配置 API Key 以使用真实 AI'}>
+                <Tooltip title={aiConfig.apiKey ? `${AI_PROVIDERS[aiConfig.provider].label} · ${aiConfig.modelId}` : '配置 AI 模型以使用真实 AI'}>
                   <Button
                     size="small"
                     icon={<KeyOutlined />}
                     onClick={() => setKeyModalOpen(true)}
                     style={{
-                      background: apiKey ? 'rgba(0,255,136,0.1)' : 'rgba(0,212,255,0.08)',
-                      border: `1px solid ${apiKey ? 'rgba(0,255,136,0.3)' : 'rgba(0,212,255,0.2)'}`,
-                      color: apiKey ? '#00ff88' : '#00d4ff',
+                      background: aiConfig.apiKey ? 'rgba(0,255,136,0.1)' : 'rgba(0,212,255,0.08)',
+                      border: `1px solid ${aiConfig.apiKey ? 'rgba(0,255,136,0.3)' : 'rgba(0,212,255,0.2)'}`,
+                      color: aiConfig.apiKey ? '#00ff88' : '#00d4ff',
                     }}
                   >
-                    {apiKey ? 'AI已激活' : '配置Key'}
+                    {aiConfig.apiKey ? 'AI已激活' : '配置模型'}
                   </Button>
                 </Tooltip>
               </div>
@@ -754,11 +699,11 @@ export default function KnowledgeBase() {
         )}
       </Modal>
 
-      <ApiKeyModal
+      <AIModelSelector
         open={keyModalOpen}
         onClose={() => setKeyModalOpen(false)}
-        apiKey={apiKey}
-        onSave={handleSaveKey}
+        config={aiConfig}
+        onChange={setAiConfig}
       />
     </div>
   );

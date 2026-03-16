@@ -11,6 +11,7 @@ import SpotMarket from './pages/SpotMarket';
 import SmartBidding from './pages/SmartBidding';
 import ComplianceControl from './pages/ComplianceControl';
 import KnowledgeBase from './pages/KnowledgeBase';
+import InvestmentCalculator from './pages/InvestmentCalculator';
 import Login from './pages/Login';
 
 const darkTheme = {
@@ -94,6 +95,9 @@ export default function App() {
                       } />
                       <Route path="/knowledge" element={
                         <ProtectedRoute path="/knowledge"><KnowledgeBase /></ProtectedRoute>
+                      } />
+                      <Route path="/investment" element={
+                        <ProtectedRoute path="/investment"><InvestmentCalculator /></ProtectedRoute>
                       } />
                     </Routes>
                   </AppLayout>

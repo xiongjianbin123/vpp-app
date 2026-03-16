@@ -1,14 +1,16 @@
 import { useState, useRef, useEffect } from 'react';
-import { Drawer, Input, Button, Tag, Tooltip, Alert, Modal } from 'antd';
+import { Drawer, Input, Button, Tag, Tooltip } from 'antd';
 import {
   SendOutlined, RobotOutlined, UserOutlined, LoadingOutlined,
-  SettingOutlined, KeyOutlined, CheckCircleOutlined, ApiOutlined,
+  SettingOutlined, CheckCircleOutlined, ApiOutlined,
 } from '@ant-design/icons';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip,
   ResponsiveContainer, PieChart, Pie, Cell, Legend,
 } from 'recharts';
-import Anthropic from '@anthropic-ai/sdk';
+import { streamAI, loadAIConfig, AI_PROVIDERS } from '../../services/aiService';
+import type { AIConfig } from '../../services/aiService';
+import AIModelSelector from '../AIModelSelector';
 import { mockDevices, mockTasks } from '../../mock/data';
 
 // ─── 常见问题 ─────────────────────────────────────────────────────
@@ -330,44 +332,6 @@ function RenderText({ text }: { text: string }) {
   );
 }
 
-// ─── API Key 设置弹窗 ─────────────────────────────────────────────
-function ApiKeyModal({ open, onClose, onSave }: { open: boolean; onClose: () => void; onSave: (key: string) => void }) {
-  const [val, setVal] = useState(() => localStorage.getItem('vpp_claude_key') ?? '');
-  return (
-    <Modal
-      title={<span style={{ color: '#00d4ff' }}><KeyOutlined /> 配置 Claude API Key</span>}
-      open={open}
-      onCancel={onClose}
-      onOk={() => { onSave(val.trim()); onClose(); }}
-      okText="保存"
-      cancelText="取消"
-      okButtonProps={{ style: { background: '#00d4ff', border: 'none', color: '#0a0e1a' } }}
-    >
-      <div style={{ marginTop: 8 }}>
-        <Alert
-          message="API Key 仅保存在本地浏览器（localStorage），不会上传到任何服务器"
-          type="info" showIcon
-          style={{ marginBottom: 16, fontSize: 12 }}
-        />
-        <Input.Password
-          value={val}
-          onChange={e => setVal(e.target.value)}
-          placeholder="sk-ant-api03-..."
-          style={{ fontFamily: 'monospace' }}
-        />
-        <div style={{ color: '#6b7280', fontSize: 12, marginTop: 8 }}>
-          前往 <a href="https://console.anthropic.com" target="_blank" rel="noreferrer" style={{ color: '#00d4ff' }}>console.anthropic.com</a> 获取 API Key
-        </div>
-        {val && (
-          <div style={{ marginTop: 8 }}>
-            <Button size="small" danger onClick={() => setVal('')}>清除 Key</Button>
-          </div>
-        )}
-      </div>
-    </Modal>
-  );
-}
-
 // ─── 主组件 ──────────────────────────────────────────────────────
 interface AIAssistantProps {
   open: boolean;
@@ -384,20 +348,15 @@ export default function AIAssistant({ open, onClose }: AIAssistantProps) {
   const [messages, setMessages] = useState<AIMessage[]>([INIT_MSG]);
   const [input, setInput] = useState('');
   const [thinking, setThinking] = useState(false);
-  const [apiKey, setApiKey] = useState<string>(() => localStorage.getItem('vpp_claude_key') ?? '');
+  const [aiConfig, setAiConfig] = useState<AIConfig>(() => loadAIConfig());
   const [keyModalOpen, setKeyModalOpen] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  const hasKey = apiKey.length > 10;
+  const hasKey = aiConfig.apiKey.length > 10;
 
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, thinking]);
-
-  const saveKey = (key: string) => {
-    localStorage.setItem('vpp_claude_key', key);
-    setApiKey(key);
-  };
 
   // 快捷问题 → Mock 即时响应
   const sendMock = (question: string) => {
@@ -430,27 +389,17 @@ export default function AIAssistant({ open, onClose }: AIAssistantProps) {
       return;
     }
 
-    // 有 Key → 真实 Claude API 流式
+    // 有 Key → 真实 AI 流式
     const msgId = (Date.now() + 1).toString();
     setMessages(prev => [...prev, { id: msgId, role: 'assistant', source: 'ai', text: '', streaming: true, ts: new Date() }]);
     setThinking(false);
 
     try {
-      const client = new Anthropic({ apiKey, dangerouslyAllowBrowser: true });
-      const stream = client.messages.stream({
-        model: 'claude-haiku-4-5-20251001',
-        max_tokens: 1024,
-        system: buildSystemPrompt(),
-        messages: [{ role: 'user', content: question }],
-      });
-
       let fullText = '';
-      stream.on('text', (chunk) => {
+      for await (const chunk of streamAI(aiConfig, buildSystemPrompt(), [{ role: 'user', content: question }])) {
         fullText += chunk;
         setMessages(prev => prev.map(m => m.id === msgId ? { ...m, text: fullText } : m));
-      });
-
-      await stream.finalMessage();
+      }
       setMessages(prev => prev.map(m => m.id === msgId ? { ...m, streaming: false } : m));
     } catch (err: unknown) {
       const errMsg = err instanceof Error ? err.message : String(err);
@@ -474,7 +423,7 @@ export default function AIAssistant({ open, onClose }: AIAssistantProps) {
                 <div style={{ color: '#4a6080', fontSize: 11, fontWeight: 400 }}>VPP AI 运营助手</div>
               </div>
             </div>
-            <Tooltip title={hasKey ? `已配置 Claude API Key（${apiKey.slice(0, 12)}...）` : '点击配置 Claude API Key，启用真实 AI 对话'}>
+            <Tooltip title={hasKey ? `${AI_PROVIDERS[aiConfig.provider].label} · ${aiConfig.modelId}` : '点击配置 AI 模型和 API Key'}>
               <Button
                 size="small"
                 icon={hasKey ? <CheckCircleOutlined /> : <ApiOutlined />}
@@ -486,7 +435,7 @@ export default function AIAssistant({ open, onClose }: AIAssistantProps) {
                   fontSize: 12, borderRadius: 6,
                 }}
               >
-                {hasKey ? 'AI 已接入' : '配置 API Key'}
+                {hasKey ? 'AI 已接入' : '配置模型'}
               </Button>
             </Tooltip>
           </div>
@@ -563,7 +512,7 @@ export default function AIAssistant({ open, onClose }: AIAssistantProps) {
           {!hasKey && (
             <div style={{ color: '#4a6080', fontSize: 11, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
               <SettingOutlined />
-              <span>配置 API Key 后，输入框将启用真实 Claude AI 对话</span>
+              <span>配置 AI 模型后，输入框将启用真实 AI 对话</span>
               <span style={{ color: '#00d4ff', cursor: 'pointer' }} onClick={() => setKeyModalOpen(true)}>立即配置 →</span>
             </div>
           )}
@@ -587,13 +536,18 @@ export default function AIAssistant({ open, onClose }: AIAssistantProps) {
           {hasKey && (
             <div style={{ color: '#4a6080', fontSize: 10, marginTop: 6, display: 'flex', alignItems: 'center', gap: 4 }}>
               <CheckCircleOutlined style={{ color: '#00ff88' }} />
-              <span>已接入 Claude AI · 流式输出 · 模型 claude-haiku-4-5</span>
+              <span>已接入 {AI_PROVIDERS[aiConfig.provider].label} · 流式输出 · {aiConfig.modelId}</span>
             </div>
           )}
         </div>
       </Drawer>
 
-      <ApiKeyModal open={keyModalOpen} onClose={() => setKeyModalOpen(false)} onSave={saveKey} />
+      <AIModelSelector
+        open={keyModalOpen}
+        onClose={() => setKeyModalOpen(false)}
+        config={aiConfig}
+        onChange={setAiConfig}
+      />
     </>
   );
 }

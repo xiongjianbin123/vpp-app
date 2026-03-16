@@ -5,7 +5,7 @@ import {
   DashboardOutlined, ThunderboltOutlined, ApartmentOutlined, DollarOutlined,
   BellOutlined, UserOutlined, LogoutOutlined, SettingOutlined, IdcardOutlined,
   CheckCircleOutlined, WarningOutlined, InfoCircleOutlined, LineChartOutlined,
-  RocketOutlined, SafetyCertificateOutlined, BookOutlined,
+  RocketOutlined, SafetyCertificateOutlined, BookOutlined, CalculatorOutlined,
 } from '@ant-design/icons';
 import huitoneLogo from '/Huitone-logo.png';
 import { useAuth } from '../../context/AuthContext';
@@ -22,6 +22,7 @@ const allMenuItems = [
   { key: '/compliance-control', icon: <SafetyCertificateOutlined />, label: 'AGC合规' },
   { key: '/revenue', icon: <DollarOutlined />, label: '收益结算' },
   { key: '/knowledge', icon: <BookOutlined />, label: '知识库' },
+  { key: '/investment', icon: <CalculatorOutlined />, label: '投资测算' },
 ];
 
 const pageNames: Record<string, string> = {
@@ -33,6 +34,7 @@ const pageNames: Record<string, string> = {
   '/compliance-control': '合规接入与AGC直控监控',
   '/revenue': '收益结算',
   '/knowledge': '知识库与智能问答',
+  '/investment': '储能投资测算',
 };
 
 interface Notice {

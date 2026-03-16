@@ -12,6 +12,7 @@
   "dependencies": {
     "@ant-design/icons": "^6.1.0",
     "@anthropic-ai/sdk": "^0.78.0",
+    "openai": "^4.103.0",
     "antd": "^6.3.2",
     "react": "^19.2.4",
     "react-dom": "^19.2.4",

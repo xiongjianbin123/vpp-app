@@ -23,27 +23,27 @@ export const roles: Record<RoleKey, Role> = {
   sales_gm: {
     key: 'sales_gm',
     label: '售电总经理',
-    allowedRoutes: ['/', '/devices', '/demand-response', '/spot-market', '/smart-bidding', '/compliance-control', '/revenue', '/knowledge'],
+    allowedRoutes: ['/', '/devices', '/demand-response', '/spot-market', '/smart-bidding', '/compliance-control', '/revenue', '/knowledge', '/investment'],
   },
   sales_manager: {
     key: 'sales_manager',
     label: '售电销售经理',
-    allowedRoutes: ['/', '/devices', '/revenue', '/knowledge'],
+    allowedRoutes: ['/', '/devices', '/revenue', '/knowledge', '/investment'],
   },
   trading_director: {
     key: 'trading_director',
     label: '电力交易总监',
-    allowedRoutes: ['/', '/devices', '/demand-response', '/spot-market', '/smart-bidding', '/revenue', '/knowledge'],
+    allowedRoutes: ['/', '/devices', '/demand-response', '/spot-market', '/smart-bidding', '/revenue', '/knowledge', '/investment'],
   },
   trading_manager: {
     key: 'trading_manager',
     label: '电力交易经理',
-    allowedRoutes: ['/', '/spot-market', '/smart-bidding', '/knowledge'],
+    allowedRoutes: ['/', '/spot-market', '/smart-bidding', '/knowledge', '/investment'],
   },
   ops_manager: {
     key: 'ops_manager',
     label: '运维经理',
-    allowedRoutes: ['/', '/devices', '/demand-response', '/compliance-control', '/knowledge'],
+    allowedRoutes: ['/', '/devices', '/demand-response', '/compliance-control', '/knowledge', '/investment'],
   },
 };
 
