@@ -41,16 +41,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           height: 64,
           display: 'flex',
           alignItems: 'center',
-          justifyContent: collapsed ? 'center' : 'flex-start',
-          padding: collapsed ? 0 : '0 20px',
+          justifyContent: 'center',
+          padding: collapsed ? 0 : '0 16px',
           borderBottom: '1px solid rgba(0, 212, 255, 0.15)',
         }}>
-          <span style={{ fontSize: 22, marginRight: collapsed ? 0 : 10 }}>⚡</span>
-          {!collapsed && (
-            <span style={{ color: '#00d4ff', fontWeight: 700, fontSize: 15, letterSpacing: 1 }}>
-              Guangzhou HuiTone Technology
-            </span>
-          )}
+          <img
+            src="/Huitone-logo.png"
+            alt="Huitone Logo"
+            style={{
+              height: collapsed ? 32 : 40,
+              maxWidth: '100%',
+              objectFit: 'contain',
+            }}
+          />
         </div>
 
         <Menu
