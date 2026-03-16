@@ -16,6 +16,7 @@ import AIModelSelector from '../../components/AIModelSelector';
 import { mockNews } from '../../mock/data';
 import type { NewsItem } from '../../mock/data';
 import { generateMockExcerpt, generateMockTags } from '../../mock/data';
+import { useTheme } from '../../context/ThemeContext';
 
 const { Dragger } = Upload;
 const { TextArea } = Input;
@@ -74,11 +75,6 @@ function detectType(name: string): KnowledgeDoc['type'] {
   return '其他';
 }
 
-function typeIcon(type: KnowledgeDoc['type']) {
-  if (type === 'PDF') return <FilePdfOutlined style={{ color: '#ff6b6b', fontSize: 16 }} />;
-  if (type === 'Word') return <FileWordOutlined style={{ color: '#00d4ff', fontSize: 16 }} />;
-  return <FileTextOutlined style={{ color: '#aab4c8', fontSize: 16 }} />;
-}
 
 function loadDocs(): KnowledgeDoc[] {
   try {
@@ -175,14 +171,21 @@ function buildMockResponse(q: string, docs: KnowledgeDoc[], news: NewsItem[]): s
 
 // ─── Main Component ────────────────────────────────────────────────────────────
 
-const cardStyle: React.CSSProperties = {
-  background: '#111827',
-  border: '1px solid rgba(0,212,255,0.12)',
-  borderRadius: 12,
-  height: '100%',
-};
-
 export default function KnowledgeBase() {
+  const { colors: c } = useTheme();
+
+  const cardStyle: React.CSSProperties = {
+    background: c.bgCard,
+    border: `1px solid ${c.primaryBorderLight}`,
+    borderRadius: 12,
+    height: '100%',
+  };
+
+  const typeIcon = (type: KnowledgeDoc['type']) => {
+    if (type === 'PDF') return <FilePdfOutlined style={{ color: '#ff6b6b', fontSize: 16 }} />;
+    if (type === 'Word') return <FileWordOutlined style={{ color: c.primary, fontSize: 16 }} />;
+    return <FileTextOutlined style={{ color: c.textSecondary, fontSize: 16 }} />;
+  };
   // News
   const [news, setNews] = useState<NewsItem[]>(() =>
     seededShuffle(mockNews, Math.floor(Date.now() / 60000))
@@ -262,7 +265,7 @@ export default function KnowledgeBase() {
     if (!text.trim() || thinking) return;
     setInput('');
     setThinking(true);
-    setQaCount(c => c + 1);
+    setQaCount(prev => prev + 1);
 
     const userMsg: QAMessage = {
       id: Date.now().toString(),
@@ -323,7 +326,7 @@ export default function KnowledgeBase() {
     const parts = text.split(/(\*\*[^*]+\*\*|\[来源:[^\]]+\]|\[资讯:[^\]]+\])/g);
     return parts.map((part, i) => {
       if (part.startsWith('**') && part.endsWith('**')) {
-        return <strong key={i} style={{ color: '#00d4ff' }}>{part.slice(2, -2)}</strong>;
+        return <strong key={i} style={{ color: c.primary }}>{part.slice(2, -2)}</strong>;
       }
       if (part.startsWith('[来源:')) {
         return <Tag key={i} color="blue" style={{ fontSize: 11, margin: '0 2px' }}>{part.slice(1, -1)}</Tag>;
@@ -344,7 +347,7 @@ export default function KnowledgeBase() {
       {/* KPI Bar */}
       <Row gutter={16}>
         {[
-          { label: '已索引文档', value: indexedCount, suffix: '份', color: '#00d4ff' },
+          { label: '已索引文档', value: indexedCount, suffix: '份', color: c.primary },
           { label: '今日市场资讯', value: news.length, suffix: '条', color: '#00ff88' },
           { label: '累计问答次数', value: qaCount, suffix: '次', color: '#a78bfa' },
           { label: '知识库状态', value: '正常运行', suffix: '', color: '#00ff88' },
@@ -352,9 +355,9 @@ export default function KnowledgeBase() {
           <Col span={6} key={i}>
             <Card style={{ ...cardStyle, height: 'auto' }}>
               <Statistic
-                title={<span style={{ color: '#4a6080', fontSize: 12 }}>{kpi.label}</span>}
+                title={<span style={{ color: c.textDim, fontSize: 12 }}>{kpi.label}</span>}
                 value={kpi.value}
-                suffix={<span style={{ fontSize: 14, color: '#6b7280' }}>{kpi.suffix}</span>}
+                suffix={<span style={{ fontSize: 14, color: c.textMuted }}>{kpi.suffix}</span>}
                 valueStyle={{ color: kpi.color, fontSize: 24, fontFamily: 'monospace' }}
               />
             </Card>
@@ -370,12 +373,12 @@ export default function KnowledgeBase() {
             style={cardStyle}
             title={
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ color: '#00d4ff' }}>今日市场资讯</span>
+                <span style={{ color: c.primary }}>今日市场资讯</span>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <span style={{ color: '#4a6080', fontSize: 11 }}>更新: {lastRefresh}</span>
+                  <span style={{ color: c.textDim, fontSize: 11 }}>更新: {lastRefresh}</span>
                   <Tooltip title="手动刷新">
                     <ReloadOutlined
-                      style={{ color: '#4a6080', cursor: 'pointer', fontSize: 13 }}
+                      style={{ color: c.textDim, cursor: 'pointer', fontSize: 13 }}
                       onClick={() => {
                         setNews(seededShuffle(mockNews, Date.now()));
                         setLastRefresh(new Date().toLocaleTimeString('zh-CN'));
@@ -393,7 +396,7 @@ export default function KnowledgeBase() {
                   <List.Item
                     style={{
                       padding: '10px 0',
-                      borderBottom: '1px solid rgba(255,255,255,0.04)',
+                      borderBottom: `1px solid ${c.borderSubtle}`,
                       cursor: 'pointer',
                     }}
                     onClick={() => setSelectedNews(item)}
@@ -410,12 +413,12 @@ export default function KnowledgeBase() {
                         }}>
                           {item.category}
                         </Tag>
-                        <span style={{ color: '#4a6080', fontSize: 10 }}>{item.date}</span>
+                        <span style={{ color: c.textDim, fontSize: 10 }}>{item.date}</span>
                       </div>
-                      <div style={{ color: '#e2e8f0', fontSize: 12, lineHeight: 1.5, marginBottom: 4 }}>
+                      <div style={{ color: c.textPrimary, fontSize: 12, lineHeight: 1.5, marginBottom: 4 }}>
                         {item.title}
                       </div>
-                      <div style={{ color: '#4a6080', fontSize: 11 }}>{item.source}</div>
+                      <div style={{ color: c.textDim, fontSize: 11 }}>{item.source}</div>
                     </div>
                   </List.Item>
                 )}
@@ -428,7 +431,7 @@ export default function KnowledgeBase() {
         <Col span={8}>
           <Card
             style={cardStyle}
-            title={<span style={{ color: '#00d4ff' }}>内部文档库</span>}
+            title={<span style={{ color: c.primary }}>内部文档库</span>}
           >
             <Spin spinning={uploading}>
               <Dragger
@@ -437,22 +440,22 @@ export default function KnowledgeBase() {
                 fileList={[]}
                 showUploadList={false}
                 style={{
-                  background: 'rgba(0,212,255,0.03)',
-                  border: '1px dashed rgba(0,212,255,0.3)',
+                  background: c.primaryMuted,
+                  border: `1px dashed ${c.primaryBorder}`,
                   borderRadius: 8,
                   marginBottom: 16,
                 }}
               >
-                <p style={{ fontSize: 24, color: '#00d4ff', marginBottom: 8 }}>
+                <p style={{ fontSize: 24, color: c.primary, marginBottom: 8 }}>
                   <InboxOutlined />
                 </p>
-                <p style={{ color: '#aab4c8', fontSize: 13, marginBottom: 4 }}>拖拽文件到此处，或点击上传</p>
-                <p style={{ color: '#4a6080', fontSize: 11 }}>支持 PDF、Word、TXT 格式</p>
+                <p style={{ color: c.textSecondary, fontSize: 13, marginBottom: 4 }}>拖拽文件到此处，或点击上传</p>
+                <p style={{ color: c.textDim, fontSize: 11 }}>支持 PDF、Word、TXT 格式</p>
               </Dragger>
             </Spin>
 
             {docs.length === 0 ? (
-              <div style={{ textAlign: 'center', color: '#4a6080', fontSize: 12, padding: '20px 0' }}>
+              <div style={{ textAlign: 'center', color: c.textDim, fontSize: 12, padding: '20px 0' }}>
                 暂无文档，上传后可进行智能问答
               </div>
             ) : (
@@ -460,27 +463,27 @@ export default function KnowledgeBase() {
                 {docs.map(doc => (
                   <div key={doc.id} style={{
                     padding: '10px 12px',
-                    background: '#0d1526',
+                    background: c.bgSider,
                     borderRadius: 8,
                     marginBottom: 8,
-                    border: '1px solid rgba(255,255,255,0.05)',
+                    border: `1px solid ${c.borderSubtle}`,
                   }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                       <div style={{ display: 'flex', gap: 8, flex: 1, minWidth: 0 }}>
                         {typeIcon(doc.type)}
                         <div style={{ flex: 1, minWidth: 0 }}>
                           <div style={{
-                            color: '#e2e8f0', fontSize: 12, fontWeight: 500,
+                            color: c.textPrimary, fontSize: 12, fontWeight: 500,
                             overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
                           }}>
                             {doc.name}
                           </div>
-                          <div style={{ color: '#4a6080', fontSize: 11, marginTop: 2 }}>
+                          <div style={{ color: c.textDim, fontSize: 11, marginTop: 2 }}>
                             {doc.size} · {doc.uploadedAt}
                           </div>
                           <div style={{ marginTop: 4, display: 'flex', flexWrap: 'wrap', gap: 3 }}>
                             {doc.tags.map(t => (
-                              <Tag key={t} style={{ fontSize: 10, padding: '0 4px', margin: 0, background: 'rgba(0,212,255,0.06)', border: '1px solid rgba(0,212,255,0.15)', color: '#6b9ac4' }}>{t}</Tag>
+                              <Tag key={t} style={{ fontSize: 10, padding: '0 4px', margin: 0, background: c.primaryMuted, border: `1px solid ${c.primaryBorderLight}`, color: c.textSecondary }}>{t}</Tag>
                             ))}
                           </div>
                         </div>
@@ -496,7 +499,7 @@ export default function KnowledgeBase() {
                           <CloseCircleOutlined style={{ color: '#ff4d4d', fontSize: 14 }} />
                         )}
                         <DeleteOutlined
-                          style={{ color: '#4a6080', cursor: 'pointer', fontSize: 13 }}
+                          style={{ color: c.textDim, cursor: 'pointer', fontSize: 13 }}
                           onClick={() => handleDeleteDoc(doc.id)}
                         />
                       </div>
@@ -504,7 +507,7 @@ export default function KnowledgeBase() {
                     {doc.status === 'indexing' && (
                       <div style={{ marginTop: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
                         <SyncOutlined spin style={{ color: '#ffb800', fontSize: 12 }} />
-                        <span style={{ color: '#4a6080', fontSize: 11 }}>正在向量化文档内容...</span>
+                        <span style={{ color: c.textDim, fontSize: 11 }}>正在向量化文档内容...</span>
                       </div>
                     )}
                   </div>
@@ -520,7 +523,7 @@ export default function KnowledgeBase() {
             style={cardStyle}
             title={
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ color: '#00d4ff' }}>
+                <span style={{ color: c.primary }}>
                   <BookOutlined style={{ marginRight: 6 }} />
                   智能问答
                 </span>
@@ -530,9 +533,9 @@ export default function KnowledgeBase() {
                     icon={<KeyOutlined />}
                     onClick={() => setKeyModalOpen(true)}
                     style={{
-                      background: aiConfig.apiKey ? 'rgba(0,255,136,0.1)' : 'rgba(0,212,255,0.08)',
-                      border: `1px solid ${aiConfig.apiKey ? 'rgba(0,255,136,0.3)' : 'rgba(0,212,255,0.2)'}`,
-                      color: aiConfig.apiKey ? '#00ff88' : '#00d4ff',
+                      background: aiConfig.apiKey ? `${c.success}1a` : c.primaryMuted,
+                      border: `1px solid ${aiConfig.apiKey ? `${c.success}4d` : c.primaryBorder}`,
+                      color: aiConfig.apiKey ? c.success : c.primary,
                     }}
                   >
                     {aiConfig.apiKey ? 'AI已激活' : '配置模型'}
@@ -545,20 +548,20 @@ export default function KnowledgeBase() {
             <div style={{ height: 360, overflowY: 'auto', marginBottom: 12, paddingRight: 4 }}>
               {messages.length === 0 && (
                 <div style={{ padding: '20px 0', textAlign: 'center' }}>
-                  <RobotOutlined style={{ fontSize: 32, color: 'rgba(0,212,255,0.3)', marginBottom: 8 }} />
-                  <div style={{ color: '#4a6080', fontSize: 12 }}>基于知识库文档和今日资讯回答您的问题</div>
+                  <RobotOutlined style={{ fontSize: 32, color: c.primaryMuted, marginBottom: 8 }} />
+                  <div style={{ color: c.textDim, fontSize: 12 }}>基于知识库文档和今日资讯回答您的问题</div>
                   <div style={{ marginTop: 16, display: 'flex', flexDirection: 'column', gap: 6 }}>
                     {SUGGESTED_QUESTIONS.map((q, i) => (
                       <div
                         key={i}
                         onClick={() => sendMessage(q)}
                         style={{
-                          background: 'rgba(0,212,255,0.05)',
-                          border: '1px solid rgba(0,212,255,0.15)',
+                          background: c.primaryMuted,
+                          border: `1px solid ${c.primaryBorderLight}`,
                           borderRadius: 8,
                           padding: '8px 12px',
                           cursor: 'pointer',
-                          color: '#aab4c8',
+                          color: c.textSecondary,
                           fontSize: 12,
                           textAlign: 'left',
                           transition: 'all 0.2s',
@@ -581,29 +584,29 @@ export default function KnowledgeBase() {
                 }}>
                   <div style={{
                     width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
-                    background: msg.role === 'user' ? 'rgba(0,212,255,0.15)' : 'rgba(167,139,250,0.15)',
-                    border: `1px solid ${msg.role === 'user' ? 'rgba(0,212,255,0.3)' : 'rgba(167,139,250,0.3)'}`,
+                    background: msg.role === 'user' ? c.primaryBorderLight : 'rgba(167,139,250,0.15)',
+                    border: `1px solid ${msg.role === 'user' ? c.primaryBorder : 'rgba(167,139,250,0.3)'}`,
                     display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13,
                   }}>
                     {msg.role === 'user'
-                      ? <UserOutlined style={{ color: '#00d4ff' }} />
+                      ? <UserOutlined style={{ color: c.primary }} />
                       : <RobotOutlined style={{ color: '#a78bfa' }} />
                     }
                   </div>
                   <div style={{
                     maxWidth: '85%',
-                    background: msg.role === 'user' ? 'rgba(0,212,255,0.08)' : '#0d1526',
-                    border: `1px solid ${msg.role === 'user' ? 'rgba(0,212,255,0.2)' : 'rgba(255,255,255,0.06)'}`,
+                    background: msg.role === 'user' ? c.primaryMuted : c.bgSider,
+                    border: `1px solid ${msg.role === 'user' ? c.primaryBorder : c.borderSubtle}`,
                     borderRadius: msg.role === 'user' ? '12px 4px 12px 12px' : '4px 12px 12px 12px',
                     padding: '10px 12px',
                   }}>
-                    <div style={{ color: '#e2e8f0', fontSize: 12, lineHeight: 1.6 }}>
+                    <div style={{ color: c.textPrimary, fontSize: 12, lineHeight: 1.6 }}>
                       {msg.streaming && msg.text === ''
                         ? <SyncOutlined spin style={{ color: '#a78bfa' }} />
                         : renderMessageText(msg.text)
                       }
                     </div>
-                    <div style={{ color: '#2d3748', fontSize: 10, marginTop: 4, textAlign: 'right' }}>{msg.ts}</div>
+                    <div style={{ color: c.textDim, fontSize: 10, marginTop: 4, textAlign: 'right' }}>{msg.ts}</div>
                   </div>
                 </div>
               ))}
@@ -625,9 +628,9 @@ export default function KnowledgeBase() {
                 autoSize={{ minRows: 1, maxRows: 3 }}
                 disabled={thinking}
                 style={{
-                  background: '#0d1526',
-                  border: '1px solid rgba(0,212,255,0.2)',
-                  color: '#e2e8f0',
+                  background: c.bgSider,
+                  border: `1px solid ${c.primaryBorder}`,
+                  color: c.textPrimary,
                   fontSize: 12,
                   borderRadius: 8,
                 }}
@@ -663,25 +666,25 @@ export default function KnowledgeBase() {
                 {selectedNews.category}
               </Tag>
             )}
-            <div style={{ color: '#e2e8f0', fontSize: 14, lineHeight: 1.5 }}>
+            <div style={{ color: c.textPrimary, fontSize: 14, lineHeight: 1.5 }}>
               {selectedNews?.title}
             </div>
           </div>
         }
-        styles={{ body: { background: '#0d1526' }, header: { background: '#0d1526' } }}
+        styles={{ body: { background: c.bgSider }, header: { background: c.bgSider } }}
         width={560}
       >
         {selectedNews && (
           <div>
-            <div style={{ color: '#4a6080', fontSize: 12, marginBottom: 12 }}>
+            <div style={{ color: c.textDim, fontSize: 12, marginBottom: 12 }}>
               {selectedNews.source} · {selectedNews.date}
             </div>
-            <div style={{ color: '#aab4c8', fontSize: 13, lineHeight: 1.8 }}>
+            <div style={{ color: c.textSecondary, fontSize: 13, lineHeight: 1.8 }}>
               {selectedNews.summary}
             </div>
             <div style={{ marginTop: 12, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
               {selectedNews.tags.map(t => (
-                <Tag key={t} style={{ fontSize: 11, background: 'rgba(0,212,255,0.06)', border: '1px solid rgba(0,212,255,0.15)', color: '#6b9ac4' }}>{t}</Tag>
+                <Tag key={t} style={{ fontSize: 11, background: c.primaryMuted, border: `1px solid ${c.primaryBorderLight}`, color: c.textSecondary }}>{t}</Tag>
               ))}
             </div>
             <Button

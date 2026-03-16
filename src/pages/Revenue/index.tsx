@@ -6,6 +6,7 @@ import {
   LineChart, Line,
 } from 'recharts';
 import { generateMonthlyRevenue } from '../../mock/data';
+import { useTheme } from '../../context/ThemeContext';
 import type { ColumnType } from 'antd/es/table';
 import type { Dayjs } from 'dayjs';
 
@@ -62,6 +63,7 @@ function exportCsv(data: SubsidyItem[]) {
 }
 
 export default function Revenue() {
+  const { colors: c } = useTheme();
   const [dateRange, setDateRange] = useState<[Dayjs | null, Dayjs | null] | null>(null);
 
   const subsidyData = dateRange && dateRange[0] && dateRange[1]
@@ -76,7 +78,6 @@ export default function Revenue() {
   const settling = subsidyData.filter(s => s.status === '结算中').reduce((a, b) => a + b.amount, 0);
   const pending = subsidyData.filter(s => s.status === '待结算').reduce((a, b) => a + b.amount, 0);
 
-  // Revenue trend line data (last 7 days from subsidyData)
   const trendData = Object.entries(
     allSubsidyData.reduce((acc, d) => {
       acc[d.date] = (acc[d.date] || 0) + d.amount;
@@ -86,11 +87,15 @@ export default function Revenue() {
     .sort(([a], [b]) => a.localeCompare(b))
     .map(([date, amount]) => ({ date: date.slice(5), 日收益: amount }));
 
+  const cardStyle = { background: c.bgCard, border: `1px solid ${c.primaryBorderLight}`, borderRadius: 12 };
+  const headerStyle = { background: 'transparent', borderBottom: `1px solid ${c.primaryBorderLight}` };
+  const tooltipStyle = { background: c.bgElevated, border: `1px solid ${c.primary}`, borderRadius: 8 };
+
   const subsidyColumns: ColumnType<SubsidyItem>[] = [
     {
       title: '日期',
       dataIndex: 'date',
-      render: (v: string) => <span style={{ color: '#6b7280', fontSize: 12 }}>{v}</span>,
+      render: (v: string) => <span style={{ color: c.textMuted, fontSize: 12 }}>{v}</span>,
     },
     {
       title: '补贴类型',
@@ -102,23 +107,23 @@ export default function Revenue() {
     {
       title: '响应功率',
       dataIndex: 'power',
-      render: (v: number) => <span style={{ color: '#aab4c8' }}>{v} MW</span>,
+      render: (v: number) => <span style={{ color: c.textSecondary }}>{v} MW</span>,
     },
     {
       title: '时长',
       dataIndex: 'duration',
-      render: (v: number) => <span style={{ color: '#aab4c8' }}>{v} h</span>,
+      render: (v: number) => <span style={{ color: c.textSecondary }}>{v} h</span>,
     },
     {
       title: '单价',
       dataIndex: 'unitPrice',
-      render: (v: number) => <span style={{ color: '#aab4c8' }}>¥{v}/MWh</span>,
+      render: (v: number) => <span style={{ color: c.textSecondary }}>¥{v}/MWh</span>,
     },
     {
       title: '结算金额',
       dataIndex: 'amount',
       sorter: (a, b) => a.amount - b.amount,
-      render: (v: number) => <span style={{ color: '#00ff88', fontWeight: 600 }}>¥{(v / 10000).toFixed(2)}万</span>,
+      render: (v: number) => <span style={{ color: c.success, fontWeight: 600 }}>¥{(v / 10000).toFixed(2)}万</span>,
     },
     {
       title: '状态',
@@ -131,23 +136,21 @@ export default function Revenue() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
         <div>
-          <h2 style={{ color: '#00d4ff', margin: 0, fontSize: 20, letterSpacing: 1 }}>
-            收益结算
-          </h2>
-          <p style={{ color: '#4a6080', margin: '4px 0 0', fontSize: 12 }}>
+          <h2 style={{ color: c.primary, margin: 0, fontSize: 20, letterSpacing: 1 }}>收益结算</h2>
+          <p style={{ color: c.textDim, margin: '4px 0 0', fontSize: 12 }}>
             年度累计收益 ¥{(totalRevenue / 10000).toFixed(1)}万
           </p>
         </div>
         <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
           <RangePicker
-            style={{ background: '#111827', border: '1px solid rgba(0,212,255,0.2)' }}
+            style={{ background: c.bgCard, border: `1px solid ${c.primaryBorder}` }}
             placeholder={['开始日期', '结束日期']}
             onChange={(dates) => setDateRange(dates as [Dayjs | null, Dayjs | null] | null)}
-            suffixIcon={<FilterOutlined style={{ color: '#4a6080' }} />}
+            suffixIcon={<FilterOutlined style={{ color: c.textDim }} />}
           />
           <Button
             icon={<DownloadOutlined />}
-            style={{ background: '#111827', border: '1px solid rgba(0,212,255,0.2)', color: '#00d4ff' }}
+            style={{ background: c.bgCard, border: `1px solid ${c.primaryBorder}`, color: c.primary }}
             onClick={() => exportCsv(subsidyData)}
           >
             导出报表
@@ -158,18 +161,18 @@ export default function Revenue() {
       {/* KPI Summary */}
       <Row gutter={[16, 16]} style={{ marginBottom: 20 }}>
         {[
-          { title: '本月收益', value: monthlyData[2]['总收益'], color: '#00d4ff' },
-          { title: '已结算金额', value: settled, color: '#00ff88' },
-          { title: '结算中金额', value: settling, color: '#ffb800' },
-          { title: '待结算金额', value: pending, color: '#aab4c8' },
+          { title: '本月收益', value: monthlyData[2]['总收益'], color: c.primary },
+          { title: '已结算金额', value: settled, color: c.success },
+          { title: '结算中金额', value: settling, color: c.warning },
+          { title: '待结算金额', value: pending, color: c.textSecondary },
         ].map(item => (
           <Col key={item.title} xs={12} md={6}>
             <Card
-              style={{ background: '#111827', border: `1px solid ${item.color}25`, borderRadius: 12 }}
+              style={{ background: c.bgCard, border: `1px solid ${item.color}25`, borderRadius: 12 }}
               styles={{ body: { padding: '16px 20px' } }}
             >
               <Statistic
-                title={<span style={{ color: '#6b7280', fontSize: 12 }}>{item.title}</span>}
+                title={<span style={{ color: c.textMuted, fontSize: 12 }}>{item.title}</span>}
                 value={item.value}
                 prefix={<span style={{ color: item.color }}>¥</span>}
                 valueStyle={{ color: item.color, fontSize: 22, fontWeight: 700 }}
@@ -180,20 +183,19 @@ export default function Revenue() {
       </Row>
 
       <Row gutter={[16, 16]} style={{ marginBottom: 20 }}>
-        {/* Monthly Bar Chart */}
         <Col xs={24} lg={16}>
           <Card
-            title={<span style={{ color: '#00d4ff' }}>月度收益统计（2026年）</span>}
-            style={{ background: '#111827', border: '1px solid rgba(0,212,255,0.15)', borderRadius: 12 }}
-            styles={{ header: { background: 'transparent', borderBottom: '1px solid rgba(0,212,255,0.15)' } }}
+            title={<span style={{ color: c.primary }}>月度收益统计（2026年）</span>}
+            style={cardStyle}
+            styles={{ header: headerStyle }}
           >
             <ResponsiveContainer width="100%" height={240}>
               <BarChart data={monthlyData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                <XAxis dataKey="month" stroke="#4a6080" tick={{ fontSize: 12 }} />
-                <YAxis stroke="#4a6080" tick={{ fontSize: 12 }} tickFormatter={(v: number) => `${(v / 10000).toFixed(0)}万`} />
+                <CartesianGrid strokeDasharray="3 3" stroke={c.borderSubtle} />
+                <XAxis dataKey="month" stroke={c.textDim} tick={{ fontSize: 12 }} />
+                <YAxis stroke={c.textDim} tick={{ fontSize: 12 }} tickFormatter={(v: number) => `${(v / 10000).toFixed(0)}万`} />
                 <Tooltip
-                  contentStyle={{ background: '#1a2540', border: '1px solid #00d4ff', borderRadius: 8 }}
+                  contentStyle={tooltipStyle}
                   formatter={(v) => [`¥${(Number(v) / 10000).toFixed(1)}万`, '']}
                 />
                 <Legend />
@@ -205,34 +207,32 @@ export default function Revenue() {
           </Card>
         </Col>
 
-        {/* Daily Trend */}
         <Col xs={24} lg={8}>
           <Card
-            title={<span style={{ color: '#00d4ff' }}>近期日收益趋势</span>}
-            style={{ background: '#111827', border: '1px solid rgba(0,212,255,0.15)', borderRadius: 12 }}
-            styles={{ header: { background: 'transparent', borderBottom: '1px solid rgba(0,212,255,0.15)' } }}
+            title={<span style={{ color: c.primary }}>近期日收益趋势</span>}
+            style={cardStyle}
+            styles={{ header: headerStyle }}
           >
             <ResponsiveContainer width="100%" height={240}>
               <LineChart data={trendData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                <XAxis dataKey="date" stroke="#4a6080" tick={{ fontSize: 11 }} />
-                <YAxis stroke="#4a6080" tick={{ fontSize: 11 }} tickFormatter={(v: number) => `${(v / 10000).toFixed(0)}万`} />
+                <CartesianGrid strokeDasharray="3 3" stroke={c.borderSubtle} />
+                <XAxis dataKey="date" stroke={c.textDim} tick={{ fontSize: 11 }} />
+                <YAxis stroke={c.textDim} tick={{ fontSize: 11 }} tickFormatter={(v: number) => `${(v / 10000).toFixed(0)}万`} />
                 <Tooltip
-                  contentStyle={{ background: '#1a2540', border: '1px solid #00d4ff', borderRadius: 8 }}
+                  contentStyle={tooltipStyle}
                   formatter={(v) => [`¥${(Number(v) / 10000).toFixed(2)}万`, '日收益']}
                 />
-                <Line type="monotone" dataKey="日收益" stroke="#00d4ff" strokeWidth={2} dot={{ fill: '#00d4ff', r: 3 }} />
+                <Line type="monotone" dataKey="日收益" stroke={c.primary} strokeWidth={2} dot={{ fill: c.primary, r: 3 }} />
               </LineChart>
             </ResponsiveContainer>
           </Card>
         </Col>
       </Row>
 
-      {/* Subsidy Detail Table */}
       <Card
         title={
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ color: '#00d4ff' }}>补贴结算明细</span>
+            <span style={{ color: c.primary }}>补贴结算明细</span>
             {dateRange && (
               <Tag color="processing" style={{ cursor: 'pointer' }} onClick={() => setDateRange(null)}>
                 已筛选 {subsidyData.length} 条 · 点击清除
@@ -240,8 +240,8 @@ export default function Revenue() {
             )}
           </div>
         }
-        style={{ background: '#111827', border: '1px solid rgba(0,212,255,0.15)', borderRadius: 12 }}
-        styles={{ header: { background: 'transparent', borderBottom: '1px solid rgba(0,212,255,0.15)' } }}
+        style={cardStyle}
+        styles={{ header: headerStyle }}
       >
         <Table
           dataSource={subsidyData}
@@ -252,10 +252,10 @@ export default function Revenue() {
             <Table.Summary>
               <Table.Summary.Row>
                 <Table.Summary.Cell index={0} colSpan={5}>
-                  <span style={{ color: '#6b7280' }}>合计</span>
+                  <span style={{ color: c.textMuted }}>合计</span>
                 </Table.Summary.Cell>
                 <Table.Summary.Cell index={5}>
-                  <span style={{ color: '#00ff88', fontWeight: 700 }}>
+                  <span style={{ color: c.success, fontWeight: 700 }}>
                     ¥{(subsidyData.reduce((a, b) => a + b.amount, 0) / 10000).toFixed(2)}万
                   </span>
                 </Table.Summary.Cell>

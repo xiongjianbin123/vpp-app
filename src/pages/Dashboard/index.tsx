@@ -10,6 +10,7 @@ import {
   RobotOutlined,
 } from '@ant-design/icons';
 import AIAssistant, { SUGGESTED_QUESTIONS } from '../../components/AIAssistant';
+import { useTheme } from '../../context/ThemeContext';
 
 const COLORS = ['#38bdf8', '#00d4ff', '#ffb800', '#00ff88', '#a78bfa'];
 
@@ -65,6 +66,7 @@ function generateFreqData() {
 }
 
 export default function Dashboard() {
+  const { colors: c } = useTheme();
   const [powerData] = useState(generate24hData());
   const [freqData, setFreqData] = useState(generateFreqData());
   const [currentPower, setCurrentPower] = useState(totalCurrentPower);
@@ -81,23 +83,26 @@ export default function Dashboard() {
   }, []);
 
   const kpiCards: KpiCard[] = [
-    { title: '总装机容量', value: totalCapacity, unit: 'MW', color: '#00d4ff', trend: 0 },
-    { title: '在线设备', value: onlineCount, unit: '台', color: '#00ff88', trend: -1 },
-    { title: '当前出力功率', value: currentPower, unit: 'MW', color: '#00d4ff', trend: 2.3, dynamic: true },
-    { title: '今日发电量', value: 7842.6, unit: 'MWh', color: '#ffb800', trend: 5.7 },
-    { title: '碳减排量', value: 3921.3, unit: 'tCO₂', color: '#00ff88', trend: 5.7 },
+    { title: '总装机容量', value: totalCapacity, unit: 'MW', color: c.primary, trend: 0 },
+    { title: '在线设备', value: onlineCount, unit: '台', color: c.success, trend: -1 },
+    { title: '当前出力功率', value: currentPower, unit: 'MW', color: c.primary, trend: 2.3, dynamic: true },
+    { title: '今日发电量', value: 7842.6, unit: 'MWh', color: c.warning, trend: 5.7 },
+    { title: '碳减排量', value: 3921.3, unit: 'tCO₂', color: c.success, trend: 5.7 },
   ];
 
   const activeAlerts = alerts.filter(a => a.active);
+  const cardStyle = { background: c.bgCard, border: `1px solid ${c.primaryBorderLight}`, borderRadius: 12 };
+  const headerStyle = { borderBottom: `1px solid ${c.primaryBorderLight}`, background: 'transparent' };
+  const tooltipStyle = { background: c.bgElevated, border: `1px solid ${c.primary}`, borderRadius: 8 };
 
   return (
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16 }}>
         <div>
-          <h2 style={{ color: '#00d4ff', margin: 0, fontSize: 20, letterSpacing: 1 }}>
+          <h2 style={{ color: c.primary, margin: 0, fontSize: 20, letterSpacing: 1 }}>
             实时监控大屏
           </h2>
-          <p style={{ color: '#4a6080', margin: '4px 0 0', fontSize: 12 }}>
+          <p style={{ color: c.textDim, margin: '4px 0 0', fontSize: 12 }}>
             数据每3秒自动刷新 · 最后更新：{lastUpdate.toLocaleTimeString('zh-CN')}
           </p>
         </div>
@@ -107,17 +112,16 @@ export default function Dashboard() {
               message={`当前 ${activeAlerts.length} 条未处理告警`}
               type="warning"
               showIcon
-              style={{ background: 'rgba(255,184,0,0.08)', border: '1px solid rgba(255,184,0,0.3)', color: '#ffb800', borderRadius: 8 }}
+              style={{ background: 'rgba(255,184,0,0.08)', border: '1px solid rgba(255,184,0,0.3)', borderRadius: 8 }}
             />
           )}
           <Button
             icon={<RobotOutlined />}
             onClick={() => setAiOpen(true)}
             style={{
-              background: 'linear-gradient(135deg, rgba(0,212,255,0.15), rgba(0,255,136,0.1))',
-              border: '1px solid rgba(0,212,255,0.4)',
-              color: '#00d4ff', borderRadius: 8, fontWeight: 600,
-              boxShadow: '0 0 12px rgba(0,212,255,0.2)',
+              background: `linear-gradient(135deg, ${c.primaryMuted}, rgba(0,255,136,0.06))`,
+              border: `1px solid ${c.primaryBorder}`,
+              color: c.primary, borderRadius: 8, fontWeight: 600,
             }}
           >
             智能问数
@@ -129,15 +133,8 @@ export default function Dashboard() {
       <Row gutter={[16, 16]} style={{ marginBottom: 20 }}>
         {kpiCards.map((card) => (
           <Col key={card.title} xs={24} sm={12} md={8} lg={4} xl={4} style={{ flex: 1, minWidth: 160 }}>
-            <Card
-              style={{
-                background: '#111827',
-                border: `1px solid rgba(0, 212, 255, 0.2)`,
-                borderRadius: 12,
-              }}
-              styles={{ body: { padding: '16px' } }}
-            >
-              <div style={{ color: '#6b7280', fontSize: 12, marginBottom: 8 }}>{card.title}</div>
+            <Card style={cardStyle} styles={{ body: { padding: '16px' } }}>
+              <div style={{ color: c.textMuted, fontSize: 12, marginBottom: 8 }}>{card.title}</div>
               <div style={{ color: card.color, fontSize: 26, fontWeight: 700, lineHeight: 1 }}>
                 {card.value}
                 <span style={{ fontSize: 13, fontWeight: 400, marginLeft: 4, opacity: 0.8 }}>{card.unit}</span>
@@ -154,7 +151,7 @@ export default function Dashboard() {
                 </div>
               )}
               {card.trend === 0 && (
-                <div style={{ marginTop: 6, color: '#4a6080', fontSize: 11 }}>总额定容量</div>
+                <div style={{ marginTop: 6, color: c.textDim, fontSize: 11 }}>总额定容量</div>
               )}
             </Card>
           </Col>
@@ -165,9 +162,9 @@ export default function Dashboard() {
         {/* 24h Power Curve */}
         <Col xs={24} lg={16}>
           <Card
-            title={<span style={{ color: '#00d4ff' }}>24小时发电功率曲线</span>}
-            style={{ background: '#111827', border: '1px solid rgba(0,212,255,0.15)', borderRadius: 12 }}
-            styles={{ header: { borderBottom: '1px solid rgba(0,212,255,0.15)', background: 'transparent' } }}
+            title={<span style={{ color: c.primary }}>24小时发电功率曲线</span>}
+            style={cardStyle}
+            styles={{ header: headerStyle }}
           >
             <ResponsiveContainer width="100%" height={260}>
               <AreaChart data={powerData}>
@@ -181,13 +178,10 @@ export default function Dashboard() {
                     <stop offset="95%" stopColor="#ffb800" stopOpacity={0} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                <XAxis dataKey="time" stroke="#4a6080" tick={{ fontSize: 11 }} />
-                <YAxis stroke="#4a6080" tick={{ fontSize: 11 }} unit="MW" />
-                <Tooltip
-                  contentStyle={{ background: '#1a2540', border: '1px solid #00d4ff', borderRadius: 8 }}
-                  labelStyle={{ color: '#00d4ff' }}
-                />
+                <CartesianGrid strokeDasharray="3 3" stroke={c.borderSubtle} />
+                <XAxis dataKey="time" stroke={c.textDim} tick={{ fontSize: 11 }} />
+                <YAxis stroke={c.textDim} tick={{ fontSize: 11 }} unit="MW" />
+                <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: c.primary }} />
                 <Legend />
                 <Area type="monotone" dataKey="总功率" stroke="#00d4ff" fill="url(#colorTotal)" strokeWidth={2} />
                 <Area type="monotone" dataKey="光伏" stroke="#ffb800" fill="url(#colorSolar)" strokeWidth={1.5} />
@@ -200,9 +194,9 @@ export default function Dashboard() {
         {/* Energy Pie */}
         <Col xs={24} lg={8}>
           <Card
-            title={<span style={{ color: '#00d4ff' }}>能源结构</span>}
-            style={{ background: '#111827', border: '1px solid rgba(0,212,255,0.15)', borderRadius: 12 }}
-            styles={{ header: { borderBottom: '1px solid rgba(0,212,255,0.15)', background: 'transparent' } }}
+            title={<span style={{ color: c.primary }}>能源结构</span>}
+            style={cardStyle}
+            styles={{ header: headerStyle }}
           >
             <ResponsiveContainer width="100%" height={200}>
               <PieChart>
@@ -224,12 +218,11 @@ export default function Dashboard() {
                   ))}
                 </Pie>
                 <Tooltip
-                  contentStyle={{ background: '#1a2540', border: '1px solid #00d4ff', borderRadius: 8 }}
+                  contentStyle={tooltipStyle}
                   formatter={(v: unknown) => [`${v} MW`, '']}
                 />
               </PieChart>
             </ResponsiveContainer>
-            {/* 自定义图例 */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6, padding: '0 8px 8px' }}>
               {energyPie.map((item, index) => {
                 const total = energyPie.reduce((s, d) => s + d.value, 0);
@@ -238,11 +231,11 @@ export default function Dashboard() {
                   <div key={item.name} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                       <div style={{ width: 10, height: 10, borderRadius: 2, background: COLORS[index], flexShrink: 0 }} />
-                      <span style={{ color: '#aab4c8', fontSize: 12 }}>{item.name}</span>
+                      <span style={{ color: c.textSecondary, fontSize: 12 }}>{item.name}</span>
                     </div>
                     <div style={{ display: 'flex', gap: 10 }}>
                       <span style={{ color: COLORS[index], fontSize: 12, fontWeight: 600 }}>{pct}%</span>
-                      <span style={{ color: '#4a6080', fontSize: 11 }}>{item.value} MW</span>
+                      <span style={{ color: c.textDim, fontSize: 11 }}>{item.value} MW</span>
                     </div>
                   </div>
                 );
@@ -256,33 +249,31 @@ export default function Dashboard() {
           <Card
             title={
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ color: '#00d4ff' }}>系统告警</span>
+                <span style={{ color: c.primary }}>系统告警</span>
                 <Tag color={activeAlerts.length > 0 ? 'error' : 'success'} style={{ margin: 0 }}>
                   {activeAlerts.length > 0 ? `${activeAlerts.length} 条待处理` : '无告警'}
                 </Tag>
               </div>
             }
-            style={{ background: '#111827', border: '1px solid rgba(0,212,255,0.15)', borderRadius: 12 }}
-            styles={{ header: { borderBottom: '1px solid rgba(0,212,255,0.15)', background: 'transparent' }, body: { padding: '0 0 4px' } }}
+            style={cardStyle}
+            styles={{ header: headerStyle, body: { padding: '0 0 4px' } }}
           >
             <List
               dataSource={alerts}
               renderItem={(item) => (
                 <List.Item style={{
                   padding: '10px 16px',
-                  borderBottom: '1px solid rgba(255,255,255,0.04)',
-                  background: item.active ? `${alertConfig[item.level].color}06` : 'transparent',
+                  borderBottom: `1px solid ${c.borderSubtle}`,
+                  background: item.active ? `${alertConfig[item.level].color}10` : 'transparent',
                 }}>
                   <div style={{ display: 'flex', gap: 10, width: '100%', alignItems: 'flex-start' }}>
                     <div style={{ marginTop: 1, flexShrink: 0 }}>{alertConfig[item.level].icon}</div>
                     <div style={{ flex: 1, minWidth: 0 }}>
                       <div style={{
-                        color: item.active ? '#e2e8f0' : '#6b7280',
-                        fontSize: 12,
-                        lineHeight: 1.4,
-                        wordBreak: 'break-all',
+                        color: item.active ? c.textPrimary : c.textMuted,
+                        fontSize: 12, lineHeight: 1.4, wordBreak: 'break-all',
                       }}>{item.msg}</div>
-                      <div style={{ color: '#4a6080', fontSize: 11, marginTop: 2 }}>{item.time}</div>
+                      <div style={{ color: c.textDim, fontSize: 11, marginTop: 2 }}>{item.time}</div>
                     </div>
                     {item.active && (
                       <div style={{
@@ -303,8 +294,8 @@ export default function Dashboard() {
         <Col xs={24} md={16}>
           <Card
             style={{
-              background: 'linear-gradient(135deg, rgba(0,212,255,0.06), rgba(0,255,136,0.04))',
-              border: '1px solid rgba(0,212,255,0.25)',
+              background: `linear-gradient(135deg, ${c.primaryMuted}, rgba(0,255,136,0.04))`,
+              border: `1px solid ${c.primaryBorder}`,
               borderRadius: 12, cursor: 'pointer',
             }}
             styles={{ body: { padding: '16px 20px' } }}
@@ -314,16 +305,15 @@ export default function Dashboard() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
                 <div style={{
                   width: 44, height: 44, borderRadius: 12,
-                  background: 'linear-gradient(135deg, rgba(0,212,255,0.25), rgba(0,255,136,0.15))',
-                  border: '1px solid rgba(0,212,255,0.4)',
+                  background: `linear-gradient(135deg, ${c.primaryBorder}, rgba(0,255,136,0.15))`,
+                  border: `1px solid ${c.primaryBorder}`,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  boxShadow: '0 0 16px rgba(0,212,255,0.2)',
                 }}>
-                  <RobotOutlined style={{ color: '#00d4ff', fontSize: 22 }} />
+                  <RobotOutlined style={{ color: c.primary, fontSize: 22 }} />
                 </div>
                 <div>
-                  <div style={{ color: '#00d4ff', fontSize: 15, fontWeight: 700 }}>AI 智能问数</div>
-                  <div style={{ color: '#4a6080', fontSize: 12, marginTop: 2 }}>
+                  <div style={{ color: c.primary, fontSize: 15, fontWeight: 700 }}>AI 智能问数</div>
+                  <div style={{ color: c.textDim, fontSize: 12, marginTop: 2 }}>
                     用自然语言查询任意运营数据，支持图表可视化
                   </div>
                 </div>
@@ -331,13 +321,13 @@ export default function Dashboard() {
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
                 {SUGGESTED_QUESTIONS.slice(0, 3).map(q => (
                   <div key={q} style={{
-                    background: 'rgba(0,212,255,0.08)', border: '1px solid rgba(0,212,255,0.15)',
-                    borderRadius: 6, padding: '3px 10px', color: '#6b7280', fontSize: 11,
+                    background: c.primaryMuted, border: `1px solid ${c.primaryBorderLight}`,
+                    borderRadius: 6, padding: '3px 10px', color: c.textMuted, fontSize: 11,
                   }}>
                     {q}
                   </div>
                 ))}
-                <div style={{ color: '#4a6080', fontSize: 11, textAlign: 'right' }}>点击展开 →</div>
+                <div style={{ color: c.textDim, fontSize: 11, textAlign: 'right' }}>点击展开 →</div>
               </div>
             </div>
           </Card>
@@ -348,12 +338,12 @@ export default function Dashboard() {
           <Row gutter={[16, 16]}>
             <Col span={24}>
               <Card
-                title={<span style={{ color: '#00d4ff' }}>电网频率实时监测</span>}
-                style={{ background: '#111827', border: '1px solid rgba(0,212,255,0.15)', borderRadius: 12 }}
-                styles={{ header: { borderBottom: '1px solid rgba(0,212,255,0.15)', background: 'transparent' } }}
+                title={<span style={{ color: c.primary }}>电网频率实时监测</span>}
+                style={cardStyle}
+                styles={{ header: headerStyle }}
                 extra={
                   <div style={{ display: 'flex', gap: 16 }}>
-                    <span style={{ color: '#00d4ff', fontSize: 12 }}>
+                    <span style={{ color: c.primary, fontSize: 12 }}>
                       {freqData[freqData.length - 1]?.频率} Hz
                     </span>
                     <span style={{ color: '#00ff88', fontSize: 12 }}>
@@ -364,28 +354,13 @@ export default function Dashboard() {
               >
                 <ResponsiveContainer width="100%" height={160}>
                   <LineChart data={freqData}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                    <CartesianGrid strokeDasharray="3 3" stroke={c.borderSubtle} />
                     <XAxis dataKey="t" hide />
-                    <YAxis
-                      yAxisId="freq"
-                      domain={[49.8, 50.2]}
-                      stroke="#00d4ff"
-                      tick={{ fontSize: 11 }}
-                      unit="Hz"
-                    />
-                    <YAxis
-                      yAxisId="volt"
-                      orientation="right"
-                      domain={[210, 230]}
-                      stroke="#00ff88"
-                      tick={{ fontSize: 11 }}
-                      unit="V"
-                    />
-                    <Tooltip
-                      contentStyle={{ background: '#1a2540', border: '1px solid #00d4ff', borderRadius: 8 }}
-                    />
+                    <YAxis yAxisId="freq" domain={[49.8, 50.2]} stroke={c.primary} tick={{ fontSize: 11 }} unit="Hz" />
+                    <YAxis yAxisId="volt" orientation="right" domain={[210, 230]} stroke="#00ff88" tick={{ fontSize: 11 }} unit="V" />
+                    <Tooltip contentStyle={tooltipStyle} />
                     <Legend />
-                    <Line yAxisId="freq" type="monotone" dataKey="频率" stroke="#00d4ff" strokeWidth={2} dot={false} isAnimationActive={false} />
+                    <Line yAxisId="freq" type="monotone" dataKey="频率" stroke={c.primary} strokeWidth={2} dot={false} isAnimationActive={false} />
                     <Line yAxisId="volt" type="monotone" dataKey="电压" stroke="#00ff88" strokeWidth={2} dot={false} isAnimationActive={false} />
                   </LineChart>
                 </ResponsiveContainer>
@@ -394,16 +369,16 @@ export default function Dashboard() {
 
             <Col span={24}>
               <Card
-                title={<span style={{ color: '#00d4ff' }}>设备状态分布</span>}
-                style={{ background: '#111827', border: '1px solid rgba(0,212,255,0.15)', borderRadius: 12 }}
-                styles={{ header: { borderBottom: '1px solid rgba(0,212,255,0.15)', background: 'transparent' } }}
+                title={<span style={{ color: c.primary }}>设备状态分布</span>}
+                style={cardStyle}
+                styles={{ header: headerStyle }}
               >
                 <Row gutter={[16, 0]}>
                   {deviceStatus.map(s => (
                     <Col span={8} key={s.name}>
                       <div style={{ textAlign: 'center', padding: '8px 0' }}>
                         <div style={{ color: s.color, fontSize: 32, fontWeight: 700, lineHeight: 1 }}>{s.value}</div>
-                        <div style={{ color: '#aab4c8', fontSize: 12, marginTop: 4 }}>{s.name}</div>
+                        <div style={{ color: c.textSecondary, fontSize: 12, marginTop: 4 }}>{s.name}</div>
                         <div style={{
                           width: 8, height: 8, borderRadius: '50%',
                           background: s.color, margin: '6px auto 0',

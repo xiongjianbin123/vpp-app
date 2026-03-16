@@ -3,10 +3,12 @@ import { Form, Input, Button, Alert } from 'antd';
 import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useTheme } from '../../context/ThemeContext';
 import { mockUsers, roles } from '../../mock/users';
 import huitoneLogo from '/Huitone-logo.png';
 
 export default function Login() {
+  const { colors: c } = useTheme();
   const [error, setError] = useState(false);
   const [loading, setLoading] = useState(false);
   const { login } = useAuth();
@@ -15,7 +17,6 @@ export default function Login() {
   const handleFinish = async ({ username, password }: { username: string; password: string }) => {
     setLoading(true);
     setError(false);
-    // Small delay to feel more real
     await new Promise(r => setTimeout(r, 500));
     const ok = login(username, password);
     setLoading(false);
@@ -29,27 +30,28 @@ export default function Login() {
   return (
     <div style={{
       minHeight: '100vh',
-      background: '#0a0e1a',
+      background: c.bgPage,
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
       padding: 24,
+      transition: 'background 0.25s',
     }}>
       <div style={{
         width: 400,
-        background: '#0d1526',
-        border: '1px solid rgba(0,212,255,0.2)',
+        background: c.bgSider,
+        border: `1px solid ${c.primaryBorder}`,
         borderRadius: 16,
         padding: '40px 40px 32px',
-        boxShadow: '0 0 40px rgba(0,212,255,0.06)',
+        boxShadow: `0 0 40px ${c.primaryMuted}`,
       }}>
         {/* Logo & Title */}
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
           <img src={huitoneLogo} alt="Huitone" style={{ height: 40, marginBottom: 16 }} />
-          <div style={{ color: '#e2e8f0', fontSize: 18, fontWeight: 600, marginBottom: 4 }}>
+          <div style={{ color: c.textPrimary, fontSize: 18, fontWeight: 600, marginBottom: 4 }}>
             虚拟电厂管理平台
           </div>
-          <div style={{ color: '#4a6080', fontSize: 12 }}>Virtual Power Plant · Huitone Energy</div>
+          <div style={{ color: c.textDim, fontSize: 12 }}>Virtual Power Plant · Huitone Energy</div>
         </div>
 
         {/* Form */}
@@ -65,26 +67,24 @@ export default function Login() {
           )}
           <Form.Item name="username" rules={[{ required: true, message: '请输入用户名' }]}>
             <Input
-              prefix={<UserOutlined style={{ color: '#4a6080' }} />}
+              prefix={<UserOutlined style={{ color: c.textDim }} />}
               placeholder="用户名"
               size="large"
               style={{
-                background: '#111827',
-                border: '1px solid rgba(0,212,255,0.2)',
-                color: '#e2e8f0',
+                background: c.bgCard,
+                border: `1px solid ${c.primaryBorder}`,
                 borderRadius: 8,
               }}
             />
           </Form.Item>
           <Form.Item name="password" rules={[{ required: true, message: '请输入密码' }]}>
             <Input.Password
-              prefix={<LockOutlined style={{ color: '#4a6080' }} />}
+              prefix={<LockOutlined style={{ color: c.textDim }} />}
               placeholder="密码"
               size="large"
               style={{
-                background: '#111827',
-                border: '1px solid rgba(0,212,255,0.2)',
-                color: '#e2e8f0',
+                background: c.bgCard,
+                border: `1px solid ${c.primaryBorder}`,
                 borderRadius: 8,
               }}
             />
@@ -113,24 +113,24 @@ export default function Login() {
         <div style={{
           marginTop: 24,
           padding: '14px 16px',
-          background: 'rgba(0,212,255,0.04)',
-          border: '1px solid rgba(0,212,255,0.1)',
+          background: c.primaryMuted,
+          border: `1px solid ${c.primaryBorderLight}`,
           borderRadius: 8,
         }}>
-          <div style={{ color: '#4a6080', fontSize: 11, marginBottom: 8 }}>测试账号（用户名 / 密码）</div>
+          <div style={{ color: c.textDim, fontSize: 11, marginBottom: 8 }}>测试账号（用户名 / 密码）</div>
           {mockUsers.map(u => (
             <div key={u.username} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
-              <span style={{ color: '#6b7280', fontSize: 11 }}>
-                <span style={{ color: '#00d4ff', fontFamily: 'monospace' }}>{u.username}</span>
+              <span style={{ color: c.textMuted, fontSize: 11 }}>
+                <span style={{ color: c.primary, fontFamily: 'monospace' }}>{u.username}</span>
                 {' / '}
                 <span style={{ fontFamily: 'monospace' }}>{u.password}</span>
               </span>
-              <span style={{ color: '#4a6080', fontSize: 11 }}>{roles[u.roleKey].label}</span>
+              <span style={{ color: c.textDim, fontSize: 11 }}>{roles[u.roleKey].label}</span>
             </div>
           ))}
         </div>
 
-        <div style={{ textAlign: 'center', marginTop: 20, color: '#2d3748', fontSize: 11 }}>
+        <div style={{ textAlign: 'center', marginTop: 20, color: c.textDim, fontSize: 11, opacity: 0.6 }}>
           VPP v2.1.0 · © 2026 Huitone Energy
         </div>
       </div>

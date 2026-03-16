@@ -13,6 +13,7 @@ import {
 import { mockDevices } from '../../mock/data';
 import type { Device } from '../../mock/data';
 import type { ColumnType } from 'antd/es/table';
+import { useTheme } from '../../context/ThemeContext';
 
 const { Option } = Select;
 
@@ -39,10 +40,11 @@ const CONNECTION_TYPES = ['IEC61850协议', 'MODBUS TCP', 'MODBUS RTU', 'OCPP 1.
 const cameras = ['主控室', '电池舱 A 区', '电池舱 B 区', 'PCS 设备间'];
 
 function VideoPlaceholder({ label }: { label: string }) {
+  const { colors: c } = useTheme();
   return (
     <div style={{
-      background: '#060b14',
-      border: '1px solid rgba(0,212,255,0.15)',
+      background: c.bgPage,
+      border: `1px solid ${c.primaryBorderLight}`,
       borderRadius: 8,
       aspectRatio: '16/9',
       display: 'flex',
@@ -83,6 +85,7 @@ function VideoPlaceholder({ label }: { label: string }) {
 
 // ─── 详情 Drawer 各 Tab ─────────────────────────────────────────────────────────
 function DeviceInfoTab({ d }: { d: Device }) {
+  const { colors: c } = useTheme();
   const rows = [
     { label: '设备 ID', value: d.id },
     { label: '设备类型', value: d.type },
@@ -112,44 +115,45 @@ function DeviceInfoTab({ d }: { d: Device }) {
             { label: '建设地点', value: d.buildLocation },
           ].filter(i => i.value).map(item => (
             <div key={item.label} style={{ marginBottom: 8 }}>
-              <div style={{ color: '#4a6080', fontSize: 11, marginBottom: 2 }}>{item.label}</div>
-              <div style={{ color: '#e2e8f0', fontSize: 12, lineHeight: 1.5 }}>{item.value}</div>
+              <div style={{ color: c.textDim, fontSize: 11, marginBottom: 2 }}>{item.label}</div>
+              <div style={{ color: c.textPrimary, fontSize: 12, lineHeight: 1.5 }}>{item.value}</div>
             </div>
           ))}
         </Card>
       )}
 
-      <Card style={{ background: '#111827', border: '1px solid rgba(0,212,255,0.15)' }}
+      <Card style={{ background: c.bgCard, border: `1px solid ${c.primaryBorderLight}` }}
         styles={{ body: { padding: 16 } }}>
         {rows.map(item => (
           <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 10 }}>
-            <span style={{ color: '#4a6080', fontSize: 13 }}>{item.label}</span>
-            <span style={{ color: '#e2e8f0', fontSize: 13 }}>{item.value}</span>
+            <span style={{ color: c.textDim, fontSize: 13 }}>{item.label}</span>
+            <span style={{ color: c.textPrimary, fontSize: 13 }}>{item.value}</span>
           </div>
         ))}
         {d.soc !== undefined && (
           <div>
-            <div style={{ color: '#4a6080', fontSize: 13, marginBottom: 6 }}>荷电状态 SOC</div>
-            <Progress percent={d.soc} strokeColor={d.soc > 50 ? '#00ff88' : '#ffb800'} trailColor="#1a2540" />
+            <div style={{ color: c.textDim, fontSize: 13, marginBottom: 6 }}>荷电状态 SOC</div>
+            <Progress percent={d.soc} strokeColor={d.soc > 50 ? c.success : c.warning} trailColor={c.bgElevated} />
           </div>
         )}
       </Card>
 
-      <Card title={<span style={{ color: '#00d4ff', fontSize: 13 }}>功率利用率</span>}
-        style={{ background: '#111827', border: '1px solid rgba(0,212,255,0.15)' }}
-        styles={{ header: { background: 'transparent', borderBottom: '1px solid rgba(0,212,255,0.1)' }, body: { padding: 16, display: 'flex', justifyContent: 'center' } }}>
+      <Card title={<span style={{ color: c.primary, fontSize: 13 }}>功率利用率</span>}
+        style={{ background: c.bgCard, border: `1px solid ${c.primaryBorderLight}` }}
+        styles={{ header: { background: 'transparent', borderBottom: `1px solid ${c.primaryMuted}` }, body: { padding: 16, display: 'flex', justifyContent: 'center' } }}>
         <Progress type="circle" percent={d.capacity > 0 ? Math.round(d.currentPower / d.capacity * 100) : 0}
-          strokeColor="#00d4ff" trailColor="#1a2540"
-          format={p => <span style={{ color: '#00d4ff' }}>{p}%</span>} />
+          strokeColor={c.primary} trailColor={c.bgElevated}
+          format={p => <span style={{ color: c.primary }}>{p}%</span>} />
       </Card>
     </div>
   );
 }
 
 function BmsTab({ d }: { d: Device }) {
+  const { colors: c } = useTheme();
   const hasData = d.soh !== undefined || d.bmsModel;
   if (!hasData) {
-    return <div style={{ color: '#4a6080', textAlign: 'center', paddingTop: 40 }}>该设备暂无 BMS 数据</div>;
+    return <div style={{ color: c.textDim, textAlign: 'center', paddingTop: 40 }}>该设备暂无 BMS 数据</div>;
   }
   const voltDiff = d.maxCellVoltage && d.minCellVoltage ? d.maxCellVoltage - d.minCellVoltage : undefined;
 
@@ -169,27 +173,27 @@ function BmsTab({ d }: { d: Device }) {
       {/* SOH + 循环次数 */}
       <Row gutter={12}>
         <Col span={14}>
-          <Card style={{ background: '#111827', border: '1px solid rgba(0,212,255,0.15)' }}
+          <Card style={{ background: c.bgCard, border: `1px solid ${c.primaryBorderLight}` }}
             styles={{ body: { padding: 14, display: 'flex', flexDirection: 'column', alignItems: 'center' } }}>
-            <div style={{ color: '#4a6080', fontSize: 11, marginBottom: 8 }}>电池健康度 SOH</div>
+            <div style={{ color: c.textDim, fontSize: 11, marginBottom: 8 }}>电池健康度 SOH</div>
             <Progress type="circle" percent={d.soh ?? 100}
-              strokeColor={d.soh! >= 90 ? '#00ff88' : d.soh! >= 80 ? '#ffb800' : '#ff4d4d'}
-              trailColor="#1a2540" size={90}
-              format={p => <span style={{ color: '#e2e8f0', fontSize: 14 }}>{p}%</span>} />
-            <div style={{ color: '#4a6080', fontSize: 10, marginTop: 8 }}>
+              strokeColor={d.soh! >= 90 ? c.success : d.soh! >= 80 ? c.warning : c.danger}
+              trailColor={c.bgElevated} size={90}
+              format={p => <span style={{ color: c.textPrimary, fontSize: 14 }}>{p}%</span>} />
+            <div style={{ color: c.textDim, fontSize: 10, marginTop: 8 }}>
               {d.soh! >= 90 ? '健康' : d.soh! >= 80 ? '良好' : '需关注'}
             </div>
           </Card>
         </Col>
         <Col span={10}>
-          <Card style={{ background: '#111827', border: '1px solid rgba(0,212,255,0.15)', height: '100%' }}
+          <Card style={{ background: c.bgCard, border: `1px solid ${c.primaryBorderLight}`, height: '100%' }}
             styles={{ body: { padding: 14 } }}>
-            <div style={{ color: '#4a6080', fontSize: 11, marginBottom: 6 }}>累计循环次数</div>
-            <div style={{ color: '#00d4ff', fontSize: 24, fontWeight: 700 }}>{d.cycleCount ?? '—'}</div>
-            <div style={{ color: '#4a6080', fontSize: 10, marginTop: 4 }}>次 / 设计寿命 6000次</div>
+            <div style={{ color: c.textDim, fontSize: 11, marginBottom: 6 }}>累计循环次数</div>
+            <div style={{ color: c.primary, fontSize: 24, fontWeight: 700 }}>{d.cycleCount ?? '—'}</div>
+            <div style={{ color: c.textDim, fontSize: 10, marginTop: 4 }}>次 / 设计寿命 6000次</div>
             {d.cycleCount && (
               <Progress percent={Math.round(d.cycleCount / 6000 * 100)} size="small"
-                strokeColor="#00d4ff" trailColor="#1a2540" style={{ marginTop: 8 }} />
+                strokeColor={c.primary} trailColor={c.bgElevated} style={{ marginTop: 8 }} />
             )}
           </Card>
         </Col>
@@ -197,17 +201,17 @@ function BmsTab({ d }: { d: Device }) {
 
       {/* 单体电压 */}
       {d.maxCellVoltage && (
-        <Card title={<span style={{ color: '#aab4c8', fontSize: 12 }}>单体电压（mV）</span>}
-          style={{ background: '#111827', border: '1px solid rgba(0,212,255,0.15)' }}
-          styles={{ header: { background: 'transparent', borderBottom: '1px solid rgba(0,212,255,0.08)', padding: '8px 14px', minHeight: 'auto' }, body: { padding: 14 } }}>
+        <Card title={<span style={{ color: c.textSecondary, fontSize: 12 }}>单体电压（mV）</span>}
+          style={{ background: c.bgCard, border: `1px solid ${c.primaryBorderLight}` }}
+          styles={{ header: { background: 'transparent', borderBottom: `1px solid ${c.primaryMuted}`, padding: '8px 14px', minHeight: 'auto' }, body: { padding: 14 } }}>
           <Row gutter={12}>
             {[
-              { label: '最高', value: d.maxCellVoltage, color: '#00ff88' },
-              { label: '最低', value: d.minCellVoltage, color: '#ffb800' },
-              { label: '压差', value: voltDiff, color: voltDiff && voltDiff > 20 ? '#ff4d4d' : '#aab4c8' },
+              { label: '最高', value: d.maxCellVoltage, color: c.success },
+              { label: '最低', value: d.minCellVoltage, color: c.warning },
+              { label: '压差', value: voltDiff, color: voltDiff && voltDiff > 20 ? c.danger : c.textSecondary },
             ].map(item => (
               <Col key={item.label} span={8} style={{ textAlign: 'center' }}>
-                <div style={{ color: '#4a6080', fontSize: 11 }}>{item.label}</div>
+                <div style={{ color: c.textDim, fontSize: 11 }}>{item.label}</div>
                 <div style={{ color: item.color, fontSize: 18, fontWeight: 700, fontFamily: 'monospace' }}>{item.value}</div>
               </Col>
             ))}
@@ -216,9 +220,9 @@ function BmsTab({ d }: { d: Device }) {
       )}
 
       {/* 设备配置 */}
-      <Card title={<span style={{ color: '#aab4c8', fontSize: 12 }}>设备配置</span>}
-        style={{ background: '#111827', border: '1px solid rgba(0,212,255,0.15)' }}
-        styles={{ header: { background: 'transparent', borderBottom: '1px solid rgba(0,212,255,0.08)', padding: '8px 14px', minHeight: 'auto' }, body: { padding: 14 } }}>
+      <Card title={<span style={{ color: c.textSecondary, fontSize: 12 }}>设备配置</span>}
+        style={{ background: c.bgCard, border: `1px solid ${c.primaryBorderLight}` }}
+        styles={{ header: { background: 'transparent', borderBottom: `1px solid ${c.primaryMuted}`, padding: '8px 14px', minHeight: 'auto' }, body: { padding: 14 } }}>
         {[
           { label: '电池类型', value: d.batteryType },
           { label: '电池规格', value: d.batterySpec },
@@ -227,8 +231,8 @@ function BmsTab({ d }: { d: Device }) {
           { label: 'EMS 品牌', value: d.emsModel },
         ].filter(i => i.value).map(item => (
           <div key={item.label} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
-            <span style={{ color: '#4a6080', fontSize: 12 }}>{item.label}</span>
-            <span style={{ color: '#e2e8f0', fontSize: 12 }}>{item.value}</span>
+            <span style={{ color: c.textDim, fontSize: 12 }}>{item.label}</span>
+            <span style={{ color: c.textPrimary, fontSize: 12 }}>{item.value}</span>
           </div>
         ))}
       </Card>
@@ -237,9 +241,10 @@ function BmsTab({ d }: { d: Device }) {
 }
 
 function EnvTab({ d }: { d: Device }) {
+  const { colors: c } = useTheme();
   const hasEnv = d.temperature !== undefined || d.humidity !== undefined;
   if (!hasEnv) {
-    return <div style={{ color: '#4a6080', textAlign: 'center', paddingTop: 40 }}>该设备暂无环境监测数据</div>;
+    return <div style={{ color: c.textDim, textAlign: 'center', paddingTop: 40 }}>该设备暂无环境监测数据</div>;
   }
 
   const envItems = [
@@ -256,17 +261,17 @@ function EnvTab({ d }: { d: Device }) {
         {envItems.map(item => (
           <Col key={item.label} span={12}>
             <Card style={{
-              background: '#111827',
-              border: `1px solid ${item.warn ? 'rgba(255,77,77,0.3)' : 'rgba(0,212,255,0.15)'}`,
+              background: c.bgCard,
+              border: `1px solid ${item.warn ? 'rgba(255,77,77,0.3)' : c.primaryBorderLight}`,
               borderRadius: 10,
             }} styles={{ body: { padding: 14 } }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div style={{ color: '#4a6080', fontSize: 11 }}>{item.label}</div>
-                {item.warn && <WarningOutlined style={{ color: '#ffb800', fontSize: 12 }} />}
+                <div style={{ color: c.textDim, fontSize: 11 }}>{item.label}</div>
+                {item.warn && <WarningOutlined style={{ color: c.warning, fontSize: 12 }} />}
               </div>
-              <div style={{ color: item.warn ? '#ffb800' : item.color, fontSize: 26, fontWeight: 700, marginTop: 4, fontFamily: 'monospace' }}>
+              <div style={{ color: item.warn ? c.warning : item.color, fontSize: 26, fontWeight: 700, marginTop: 4, fontFamily: 'monospace' }}>
                 {item.value}
-                <span style={{ fontSize: 12, marginLeft: 2, color: '#4a6080' }}>{item.unit}</span>
+                <span style={{ fontSize: 12, marginLeft: 2, color: c.textDim }}>{item.unit}</span>
               </div>
             </Card>
           </Col>
@@ -275,26 +280,26 @@ function EnvTab({ d }: { d: Device }) {
 
       {/* 温度横向进度条 */}
       {d.temperature !== undefined && (
-        <Card style={{ background: '#111827', border: '1px solid rgba(0,212,255,0.15)' }}
+        <Card style={{ background: c.bgCard, border: `1px solid ${c.primaryBorderLight}` }}
           styles={{ body: { padding: 14 } }}>
-          <div style={{ color: '#4a6080', fontSize: 11, marginBottom: 10 }}>环境温度区间（0°C ~ 45°C）</div>
+          <div style={{ color: c.textDim, fontSize: 11, marginBottom: 10 }}>环境温度区间（0°C ~ 45°C）</div>
           <Progress
             percent={Math.min(100, Math.max(0, Math.round(d.temperature! / 45 * 100)))}
-            strokeColor={d.temperature! > 35 ? '#ff4d4d' : d.temperature! > 25 ? '#ffb800' : '#00ff88'}
-            trailColor="#1a2540"
+            strokeColor={d.temperature! > 35 ? c.danger : d.temperature! > 25 ? c.warning : c.success}
+            trailColor={c.bgElevated}
             format={() => `${d.temperature}°C`}
           />
         </Card>
       )}
 
       {d.humidity !== undefined && (
-        <Card style={{ background: '#111827', border: '1px solid rgba(0,212,255,0.15)' }}
+        <Card style={{ background: c.bgCard, border: `1px solid ${c.primaryBorderLight}` }}
           styles={{ body: { padding: 14 } }}>
-          <div style={{ color: '#4a6080', fontSize: 11, marginBottom: 10 }}>湿度区间（0% ~ 100%）</div>
+          <div style={{ color: c.textDim, fontSize: 11, marginBottom: 10 }}>湿度区间（0% ~ 100%）</div>
           <Progress
             percent={d.humidity}
-            strokeColor={d.humidity! > 70 ? '#ff4d4d' : d.humidity! > 60 ? '#ffb800' : '#a78bfa'}
-            trailColor="#1a2540"
+            strokeColor={d.humidity! > 70 ? c.danger : d.humidity! > 60 ? c.warning : '#a78bfa'}
+            trailColor={c.bgElevated}
             format={() => `${d.humidity}%`}
           />
         </Card>
@@ -304,9 +309,10 @@ function EnvTab({ d }: { d: Device }) {
 }
 
 function VideoTab() {
+  const { colors: c } = useTheme();
   return (
     <div>
-      <div style={{ color: '#4a6080', fontSize: 11, marginBottom: 12 }}>
+      <div style={{ color: c.textDim, fontSize: 11, marginBottom: 12 }}>
         <VideoCameraOutlined style={{ marginRight: 4 }} />
         实时视频监控（4路）· 信号正常
       </div>
@@ -317,8 +323,8 @@ function VideoTab() {
           </Col>
         ))}
       </Row>
-      <div style={{ marginTop: 12, padding: '8px 12px', background: 'rgba(0,212,255,0.04)', borderRadius: 6, border: '1px solid rgba(0,212,255,0.1)' }}>
-        <div style={{ color: '#4a6080', fontSize: 11 }}>录像存储：本地 NVR · 保留 30 天 · H.265 压缩</div>
+      <div style={{ marginTop: 12, padding: '8px 12px', background: c.primaryMuted, borderRadius: 6, border: `1px solid ${c.primaryMuted}` }}>
+        <div style={{ color: c.textDim, fontSize: 11 }}>录像存储：本地 NVR · 保留 30 天 · H.265 压缩</div>
       </div>
     </div>
   );
@@ -330,6 +336,7 @@ function AddDeviceModal({ open, onClose, onAdd }: {
   onClose: () => void;
   onAdd: (d: Device) => void;
 }) {
+  const { colors: c } = useTheme();
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
 
@@ -373,12 +380,12 @@ function AddDeviceModal({ open, onClose, onAdd }: {
     });
   };
 
-  const labelStyle = { color: '#aab4c8', fontSize: 12 };
-  const inputStyle = { background: '#0d1526', border: '1px solid rgba(0,212,255,0.2)', color: '#e2e8f0' };
+  const labelStyle = { color: c.textSecondary, fontSize: 12 };
+  const inputStyle = { background: c.bgSider, border: `1px solid ${c.primaryBorder}`, color: c.textPrimary };
 
   return (
     <Modal
-      title={<span style={{ color: '#00d4ff' }}><PlusOutlined /> 新增设备资产</span>}
+      title={<span style={{ color: c.primary }}><PlusOutlined /> 新增设备资产</span>}
       open={open}
       onCancel={onClose}
       onOk={handleSubmit}
@@ -386,12 +393,12 @@ function AddDeviceModal({ open, onClose, onAdd }: {
       okText="录入设备"
       cancelText="取消"
       width={620}
-      okButtonProps={{ style: { background: '#00d4ff', border: 'none', color: '#0a0e1a' } }}
-      styles={{ body: { background: '#1a2540', maxHeight: '70vh', overflowY: 'auto' }, header: { background: '#1a2540' } }}
+      okButtonProps={{ style: { background: c.primary, border: 'none', color: c.bgPage } }}
+      styles={{ body: { background: c.bgElevated, maxHeight: '70vh', overflowY: 'auto' }, header: { background: c.bgElevated } }}
     >
       <Form form={form} layout="vertical" style={{ marginTop: 8 }}>
         {/* 基础信息 */}
-        <div style={{ color: '#00d4ff', fontSize: 11, fontWeight: 600, marginBottom: 10, letterSpacing: 1 }}>▌ 基础信息</div>
+        <div style={{ color: c.primary, fontSize: 11, fontWeight: 600, marginBottom: 10, letterSpacing: 1 }}>▌ 基础信息</div>
         <Row gutter={12}>
           <Col span={14}>
             <Form.Item label={<span style={labelStyle}>设备名称</span>} name="name" rules={[{ required: true, message: '请输入设备名称' }]}>
@@ -437,7 +444,7 @@ function AddDeviceModal({ open, onClose, onAdd }: {
         </Row>
 
         {/* 接入配置 */}
-        <div style={{ color: '#00d4ff', fontSize: 11, fontWeight: 600, margin: '14px 0 10px', letterSpacing: 1 }}>▌ 接入配置</div>
+        <div style={{ color: c.primary, fontSize: 11, fontWeight: 600, margin: '14px 0 10px', letterSpacing: 1 }}>▌ 接入配置</div>
         <Row gutter={12}>
           <Col span={12}>
             <Form.Item label={<span style={labelStyle}>接入方式 / 通信协议</span>} name="connectionType">
@@ -454,7 +461,7 @@ function AddDeviceModal({ open, onClose, onAdd }: {
         </Row>
 
         {/* 电池及核心部件 */}
-        <div style={{ color: '#00d4ff', fontSize: 11, fontWeight: 600, margin: '14px 0 10px', letterSpacing: 1 }}>▌ 电池及核心部件（储能设备填写）</div>
+        <div style={{ color: c.primary, fontSize: 11, fontWeight: 600, margin: '14px 0 10px', letterSpacing: 1 }}>▌ 电池及核心部件（储能设备填写）</div>
         <Row gutter={12}>
           <Col span={12}>
             <Form.Item label={<span style={labelStyle}>电池类型</span>} name="batteryType">
@@ -493,6 +500,7 @@ function AddDeviceModal({ open, onClose, onAdd }: {
 
 // ─── 主页面 ──────────────────────────────────────────────────────────────────
 export default function Devices() {
+  const { colors: c } = useTheme();
   const [devices, setDevices] = useState<Device[]>(mockDevices);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
@@ -533,7 +541,7 @@ export default function Devices() {
       content: `设备：${record.name}`,
       okText: isOnline ? '停止' : '启动',
       cancelText: '取消',
-      okButtonProps: { style: { background: isOnline ? '#ff4d4d' : '#00d4ff', border: 'none', color: isOnline ? '#fff' : '#0a0e1a' } },
+      okButtonProps: { style: { background: isOnline ? c.danger : c.primary, border: 'none', color: isOnline ? '#fff' : c.bgPage } },
       onOk: () => {
         setDevices(prev => prev.map(d =>
           d.id === record.id ? { ...d, status: isOnline ? '离线' : '在线', currentPower: isOnline ? 0 : d.capacity * 0.6 } : d
@@ -549,7 +557,7 @@ export default function Devices() {
       content: `设备：${record.name}，重启期间将短暂离线`,
       okText: '重启',
       cancelText: '取消',
-      okButtonProps: { style: { background: '#ffb800', border: 'none', color: '#0a0e1a' } },
+      okButtonProps: { style: { background: c.warning, border: 'none', color: c.bgPage } },
       onOk: () => {
         setDevices(prev => prev.map(d => d.id === record.id ? { ...d, status: '维护' } : d));
         message.info(`设备 ${record.name} 重启中...`);
@@ -564,11 +572,11 @@ export default function Devices() {
   const columns: ColumnType<Device>[] = [
     {
       title: '设备ID', dataIndex: 'id', width: 90,
-      render: (v: string) => <span style={{ color: '#00d4ff', fontFamily: 'monospace' }}>{v}</span>,
+      render: (v: string) => <span style={{ color: c.primary, fontFamily: 'monospace' }}>{v}</span>,
     },
     {
       title: '设备名称', dataIndex: 'name',
-      render: (v: string) => <span style={{ color: '#e2e8f0' }}>{v}</span>,
+      render: (v: string) => <span style={{ color: c.textPrimary }}>{v}</span>,
     },
     {
       title: '类型', dataIndex: 'type',
@@ -585,15 +593,15 @@ export default function Devices() {
     },
     {
       title: '装机容量', dataIndex: 'capacity',
-      render: (v: number) => <span style={{ color: '#aab4c8' }}>{v} MW</span>,
+      render: (v: number) => <span style={{ color: c.textSecondary }}>{v} MW</span>,
     },
     {
       title: '当前功率', dataIndex: 'currentPower',
       render: (v: number, record: Device) => (
         <div>
-          <span style={{ color: '#00d4ff', fontWeight: 600 }}>{v} MW</span>
+          <span style={{ color: c.primary, fontWeight: 600 }}>{v} MW</span>
           <Progress percent={record.capacity > 0 ? Math.round(v / record.capacity * 100) : 0}
-            size="small" showInfo={false} strokeColor="#00d4ff" trailColor="#1a2540" style={{ marginTop: 2, width: 80 }} />
+            size="small" showInfo={false} strokeColor={c.primary} trailColor={c.bgElevated} style={{ marginTop: 2, width: 80 }} />
         </div>
       ),
     },
@@ -601,12 +609,12 @@ export default function Devices() {
       title: 'SOC / SOH', dataIndex: 'soc',
       render: (v?: number, record?: Device) => v !== undefined ? (
         <div>
-          <div style={{ fontSize: 11, color: '#4a6080', marginBottom: 2 }}>SOC</div>
-          <Progress percent={v} size="small" strokeColor={v > 50 ? '#00ff88' : '#ffb800'} trailColor="#1a2540" style={{ width: 80 }} />
+          <div style={{ fontSize: 11, color: c.textDim, marginBottom: 2 }}>SOC</div>
+          <Progress percent={v} size="small" strokeColor={v > 50 ? c.success : c.warning} trailColor={c.bgElevated} style={{ width: 80 }} />
           {record?.soh !== undefined && (
             <>
-              <div style={{ fontSize: 11, color: '#4a6080', marginTop: 4, marginBottom: 2 }}>SOH</div>
-              <Progress percent={record.soh} size="small" strokeColor={record.soh >= 90 ? '#00d4ff' : '#ff4d4d'} trailColor="#1a2540" style={{ width: 80 }} />
+              <div style={{ fontSize: 11, color: c.textDim, marginTop: 4, marginBottom: 2 }}>SOH</div>
+              <Progress percent={record.soh} size="small" strokeColor={record.soh >= 90 ? c.primary : c.danger} trailColor={c.bgElevated} style={{ width: 80 }} />
             </>
           )}
         </div>
@@ -614,7 +622,7 @@ export default function Devices() {
     },
     {
       title: '位置', dataIndex: 'location',
-      render: (v: string) => <span style={{ color: '#6b7280', fontSize: 12 }}>{v}</span>,
+      render: (v: string) => <span style={{ color: c.textMuted, fontSize: 12 }}>{v}</span>,
     },
     {
       title: '操作', width: 110,
@@ -622,16 +630,16 @@ export default function Devices() {
         <div style={{ display: 'flex', gap: 4 }}>
           <Tooltip title="查看详情">
             <Button type="link" icon={<EyeOutlined />} size="small"
-              style={{ color: '#00d4ff', padding: '0 4px' }} onClick={() => setSelectedDevice(record)} />
+              style={{ color: c.primary, padding: '0 4px' }} onClick={() => setSelectedDevice(record)} />
           </Tooltip>
           <Tooltip title={record.status === '在线' ? '停止设备' : '启动设备'}>
             <Button type="link" icon={record.status === '在线' ? <PauseCircleOutlined /> : <PlayCircleOutlined />}
-              size="small" style={{ color: record.status === '在线' ? '#ff4d4d' : '#00ff88', padding: '0 4px' }}
+              size="small" style={{ color: record.status === '在线' ? c.danger : c.success, padding: '0 4px' }}
               onClick={() => handleToggle(record)} />
           </Tooltip>
           <Tooltip title="重启设备">
             <Button type="link" icon={<SyncOutlined />} size="small"
-              style={{ color: '#ffb800', padding: '0 4px' }} onClick={() => handleRestart(record)}
+              style={{ color: c.warning, padding: '0 4px' }} onClick={() => handleRestart(record)}
               disabled={record.status === '维护'} />
           </Tooltip>
         </div>
@@ -664,8 +672,8 @@ export default function Devices() {
     <div>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
         <div>
-          <h2 style={{ color: '#00d4ff', margin: 0, fontSize: 20, letterSpacing: 1 }}>设备资产管理</h2>
-          <p style={{ color: '#4a6080', margin: '4px 0 0', fontSize: 12 }}>
+          <h2 style={{ color: c.primary, margin: 0, fontSize: 20, letterSpacing: 1 }}>设备资产管理</h2>
+          <p style={{ color: c.textDim, margin: '4px 0 0', fontSize: 12 }}>
             共 {devices.length} 台设备 · 在线 {devices.filter(d => d.status === '在线').length} 台 ·
             告警 {devices.filter(d => d.status === '告警').length} 台
           </p>
@@ -673,7 +681,7 @@ export default function Devices() {
         <Button
           type="primary"
           icon={<PlusOutlined />}
-          style={{ background: '#00d4ff', border: 'none', color: '#0a0e1a', fontWeight: 600 }}
+          style={{ background: c.primary, border: 'none', color: c.bgPage, fontWeight: 600 }}
           onClick={() => setAddOpen(true)}
         >
           新增设备
@@ -689,12 +697,12 @@ export default function Devices() {
           const totalCapacity = typeDevices.reduce((a, d) => a + d.capacity, 0);
           return (
             <Col key={type} flex="1" style={{ minWidth: 130 }}>
-              <Card style={{ background: '#111827', border: `1px solid ${typeColors[type]}30`, borderRadius: 10 }}
+              <Card style={{ background: c.bgCard, border: `1px solid ${typeColors[type]}30`, borderRadius: 10 }}
                 styles={{ body: { padding: '12px 16px' } }}>
                 <div style={{ fontSize: 18, marginBottom: 4 }}>{icon}</div>
                 <div style={{ color: typeColors[type], fontWeight: 600, fontSize: 12 }}>{type}</div>
-                <div style={{ color: '#aab4c8', fontSize: 11 }}>{online}/{typeDevices.length} 在线</div>
-                <div style={{ color: '#4a6080', fontSize: 11, marginTop: 2 }}>{totalPower.toFixed(1)}/{totalCapacity} MW</div>
+                <div style={{ color: c.textSecondary, fontSize: 11 }}>{online}/{typeDevices.length} 在线</div>
+                <div style={{ color: c.textDim, fontSize: 11, marginTop: 2 }}>{totalPower.toFixed(1)}/{totalCapacity} MW</div>
               </Card>
             </Col>
           );
@@ -704,11 +712,11 @@ export default function Devices() {
       {/* Filters */}
       <div style={{ display: 'flex', gap: 12, marginBottom: 16, flexWrap: 'wrap' }}>
         <Input
-          prefix={<SearchOutlined style={{ color: '#4a6080' }} />}
+          prefix={<SearchOutlined style={{ color: c.textDim }} />}
           placeholder="搜索设备名称、ID、位置..."
           value={search}
           onChange={e => setSearch(e.target.value)}
-          style={{ width: 260, background: '#111827', border: '1px solid rgba(0,212,255,0.2)', color: '#e2e8f0' }}
+          style={{ width: 260, background: c.bgCard, border: `1px solid ${c.primaryBorder}`, color: c.textPrimary }}
         />
         <Select value={typeFilter} onChange={setTypeFilter} style={{ width: 140 }}>
           <Option value="all">全部类型</Option>
@@ -723,7 +731,7 @@ export default function Devices() {
           ))}
         </Select>
         <Button icon={<ReloadOutlined spin={refreshing} />}
-          style={{ background: '#111827', border: '1px solid rgba(0,212,255,0.2)', color: '#00d4ff' }}
+          style={{ background: c.bgCard, border: `1px solid ${c.primaryBorder}`, color: c.primary }}
           onClick={handleRefresh} loading={refreshing}>
           刷新数据
         </Button>
@@ -746,7 +754,7 @@ export default function Devices() {
         title={
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div style={{ width: 8, height: 8, borderRadius: '50%', background: selectedDevice ? statusConfig[selectedDevice.status].dot : '#4a5568' }} />
-            <span style={{ color: '#00d4ff' }}>{selectedDevice?.name}</span>
+            <span style={{ color: c.primary }}>{selectedDevice?.name}</span>
             <Tag color={selectedDevice ? typeColors[selectedDevice.type] : 'default'} style={{ border: 'none', fontSize: 11 }}>{selectedDevice?.type}</Tag>
           </div>
         }
@@ -754,8 +762,8 @@ export default function Devices() {
         onClose={() => setSelectedDevice(null)}
         width={600}
         styles={{
-          body: { background: '#0d1526', padding: 16 },
-          header: { background: '#0d1526', borderBottom: '1px solid rgba(0,212,255,0.15)' },
+          body: { background: c.bgSider, padding: 16 },
+          header: { background: c.bgSider, borderBottom: `1px solid ${c.primaryBorderLight}` },
         }}
       >
         {selectedDevice && (
@@ -763,17 +771,17 @@ export default function Devices() {
             <Tabs
               defaultActiveKey="1"
               items={detailTabs}
-              style={{ color: '#aab4c8' }}
+              style={{ color: c.textSecondary }}
             />
             <div style={{ display: 'flex', gap: 8, marginTop: 16 }}>
               <Button block
-                style={{ background: selectedDevice.status === '在线' ? 'rgba(255,77,77,0.1)' : 'rgba(0,255,136,0.1)', border: `1px solid ${selectedDevice.status === '在线' ? '#ff4d4d' : '#00ff88'}`, color: selectedDevice.status === '在线' ? '#ff4d4d' : '#00ff88' }}
+                style={{ background: selectedDevice.status === '在线' ? `${c.danger}1a` : `${c.success}1a`, border: `1px solid ${selectedDevice.status === '在线' ? c.danger : c.success}`, color: selectedDevice.status === '在线' ? c.danger : c.success }}
                 icon={selectedDevice.status === '在线' ? <PauseCircleOutlined /> : <PlayCircleOutlined />}
                 onClick={() => { handleToggle(selectedDevice); setSelectedDevice(null); }}>
                 {selectedDevice.status === '在线' ? '停止设备' : '启动设备'}
               </Button>
               <Button block
-                style={{ background: 'rgba(255,184,0,0.1)', border: '1px solid #ffb800', color: '#ffb800' }}
+                style={{ background: `${c.warning}1a`, border: `1px solid ${c.warning}`, color: c.warning }}
                 icon={<SyncOutlined />}
                 onClick={() => { handleRestart(selectedDevice); setSelectedDevice(null); }}>
                 重启设备

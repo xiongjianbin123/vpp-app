@@ -2,6 +2,7 @@ import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ConfigProvider, theme } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { ThemeProvider, useTheme } from './context/ThemeContext';
 import AppLayout from './components/Layout/AppLayout';
 import Dashboard from './pages/Dashboard';
 import Devices from './pages/Devices';
@@ -13,36 +14,6 @@ import ComplianceControl from './pages/ComplianceControl';
 import KnowledgeBase from './pages/KnowledgeBase';
 import InvestmentCalculator from './pages/InvestmentCalculator';
 import Login from './pages/Login';
-
-const darkTheme = {
-  algorithm: theme.darkAlgorithm,
-  token: {
-    colorPrimary: '#00d4ff',
-    colorBgBase: '#0a0e1a',
-    colorBgContainer: '#111827',
-    colorBgElevated: '#1a2540',
-    colorBorder: 'rgba(0, 212, 255, 0.2)',
-    colorText: '#e2e8f0',
-    colorTextSecondary: '#aab4c8',
-    borderRadius: 8,
-    fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
-  },
-  components: {
-    Table: {
-      headerBg: '#0d1526',
-      rowHoverBg: '#1a2540',
-      borderColor: 'rgba(0, 212, 255, 0.1)',
-    },
-    Menu: {
-      itemSelectedBg: 'rgba(0, 212, 255, 0.1)',
-      itemSelectedColor: '#00d4ff',
-      itemHoverBg: 'rgba(0, 212, 255, 0.05)',
-    },
-    Select: {
-      optionSelectedBg: 'rgba(0, 212, 255, 0.1)',
-    },
-  },
-};
 
 // Redirect to /login if not authenticated
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -58,55 +29,116 @@ function ProtectedRoute({ children, path }: { children: React.ReactNode; path: s
   return <>{children}</>;
 }
 
+function ThemedApp() {
+  const { mode, tone, colors } = useTheme();
+
+  const p = colors.primary;
+  const antdTheme = mode === 'dark'
+    ? {
+        algorithm: theme.darkAlgorithm,
+        token: {
+          colorPrimary: p,
+          colorBgBase: colors.bgPage,
+          colorBgContainer: colors.bgCard,
+          colorBgElevated: colors.bgElevated,
+          colorBorder: colors.primaryBorder,
+          colorText: colors.textPrimary,
+          colorTextSecondary: colors.textSecondary,
+          borderRadius: 8,
+          fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+        },
+        components: {
+          Table: { headerBg: colors.bgSider, rowHoverBg: colors.bgElevated, borderColor: colors.primaryBorderLight },
+          Menu: {
+            itemSelectedBg: colors.primaryMuted,
+            itemSelectedColor: p,
+            itemHoverBg: `${p}08`,
+          },
+          Select: { optionSelectedBg: colors.primaryMuted },
+        },
+      }
+    : {
+        algorithm: theme.defaultAlgorithm,
+        token: {
+          colorPrimary: p,
+          colorBgBase: colors.bgPage,
+          colorBgContainer: colors.bgCard,
+          colorBgElevated: colors.bgElevated,
+          colorBorder: colors.primaryBorder,
+          colorText: colors.textPrimary,
+          colorTextSecondary: colors.textSecondary,
+          borderRadius: 8,
+          fontFamily: "-apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+        },
+        components: {
+          Table: { headerBg: colors.bgElevated, rowHoverBg: `${p}10`, borderColor: colors.primaryBorderLight },
+          Menu: {
+            itemSelectedBg: colors.primaryMuted,
+            itemSelectedColor: p,
+            itemHoverBg: `${p}08`,
+          },
+          Select: { optionSelectedBg: colors.primaryMuted },
+        },
+      };
+
+  void tone; // tone is consumed by ThemeContext; antd theme derives from colors
+
+  return (
+    <ConfigProvider theme={antdTheme} locale={zhCN}>
+      <HashRouter>
+        <Routes>
+          {/* Public */}
+          <Route path="/login" element={<Login />} />
+
+          {/* Protected — all inside AppLayout */}
+          <Route
+            path="/*"
+            element={
+              <RequireAuth>
+                <AppLayout>
+                  <Routes>
+                    <Route path="/" element={<Dashboard />} />
+                    <Route path="/devices" element={
+                      <ProtectedRoute path="/devices"><Devices /></ProtectedRoute>
+                    } />
+                    <Route path="/demand-response" element={
+                      <ProtectedRoute path="/demand-response"><DemandResponse /></ProtectedRoute>
+                    } />
+                    <Route path="/spot-market" element={
+                      <ProtectedRoute path="/spot-market"><SpotMarket /></ProtectedRoute>
+                    } />
+                    <Route path="/smart-bidding" element={
+                      <ProtectedRoute path="/smart-bidding"><SmartBidding /></ProtectedRoute>
+                    } />
+                    <Route path="/compliance-control" element={
+                      <ProtectedRoute path="/compliance-control"><ComplianceControl /></ProtectedRoute>
+                    } />
+                    <Route path="/revenue" element={
+                      <ProtectedRoute path="/revenue"><Revenue /></ProtectedRoute>
+                    } />
+                    <Route path="/knowledge" element={
+                      <ProtectedRoute path="/knowledge"><KnowledgeBase /></ProtectedRoute>
+                    } />
+                    <Route path="/investment" element={
+                      <ProtectedRoute path="/investment"><InvestmentCalculator /></ProtectedRoute>
+                    } />
+                  </Routes>
+                </AppLayout>
+              </RequireAuth>
+            }
+          />
+        </Routes>
+      </HashRouter>
+    </ConfigProvider>
+  );
+}
+
 export default function App() {
   return (
-    <AuthProvider>
-      <ConfigProvider theme={darkTheme} locale={zhCN}>
-        <HashRouter>
-          <Routes>
-            {/* Public */}
-            <Route path="/login" element={<Login />} />
-
-            {/* Protected — all inside AppLayout */}
-            <Route
-              path="/*"
-              element={
-                <RequireAuth>
-                  <AppLayout>
-                    <Routes>
-                      <Route path="/" element={<Dashboard />} />
-                      <Route path="/devices" element={
-                        <ProtectedRoute path="/devices"><Devices /></ProtectedRoute>
-                      } />
-                      <Route path="/demand-response" element={
-                        <ProtectedRoute path="/demand-response"><DemandResponse /></ProtectedRoute>
-                      } />
-                      <Route path="/spot-market" element={
-                        <ProtectedRoute path="/spot-market"><SpotMarket /></ProtectedRoute>
-                      } />
-                      <Route path="/smart-bidding" element={
-                        <ProtectedRoute path="/smart-bidding"><SmartBidding /></ProtectedRoute>
-                      } />
-                      <Route path="/compliance-control" element={
-                        <ProtectedRoute path="/compliance-control"><ComplianceControl /></ProtectedRoute>
-                      } />
-                      <Route path="/revenue" element={
-                        <ProtectedRoute path="/revenue"><Revenue /></ProtectedRoute>
-                      } />
-                      <Route path="/knowledge" element={
-                        <ProtectedRoute path="/knowledge"><KnowledgeBase /></ProtectedRoute>
-                      } />
-                      <Route path="/investment" element={
-                        <ProtectedRoute path="/investment"><InvestmentCalculator /></ProtectedRoute>
-                      } />
-                    </Routes>
-                  </AppLayout>
-                </RequireAuth>
-              }
-            />
-          </Routes>
-        </HashRouter>
-      </ConfigProvider>
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <ThemedApp />
+      </AuthProvider>
+    </ThemeProvider>
   );
 }

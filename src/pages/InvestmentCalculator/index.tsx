@@ -7,35 +7,14 @@ import type { ColumnType } from 'antd/es/table';
 import {
   CalculatorOutlined, DownloadOutlined, InfoCircleOutlined,
 } from '@ant-design/icons';
+import { useTheme } from '../../context/ThemeContext';
 import {
   BarChart, Bar, LineChart, Line, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip as RTooltip,
   ResponsiveContainer, Legend, ReferenceLine,
 } from 'recharts';
 
-// ─── 样式常量 ─────────────────────────────────────────────────────────────────
-
-const cardStyle: React.CSSProperties = {
-  background: '#111827',
-  border: '1px solid rgba(0,212,255,0.12)',
-  borderRadius: 12,
-};
-const headStyle = {
-  background: 'transparent',
-  borderBottom: '1px solid rgba(0,212,255,0.12)',
-};
-const labelStyle: React.CSSProperties = { color: '#aab4c8', fontSize: 12 };
-const inputStyle: React.CSSProperties = {
-  background: '#0d1526',
-  border: '1px solid rgba(0,212,255,0.2)',
-  color: '#e2e8f0',
-};
-const tooltipStyle = {
-  background: '#1a2540',
-  border: '1px solid #00d4ff',
-  borderRadius: 6,
-  fontSize: 12,
-};
+// ─── 样式常量 (moved inside component) ───────────────────────────────────────
 
 // ─── 类型定义 ─────────────────────────────────────────────────────────────────
 
@@ -386,6 +365,30 @@ const DEFAULT_CONFIG: InvestmentConfig = {
 // ─── 主组件 ───────────────────────────────────────────────────────────────────
 
 export default function InvestmentCalculator() {
+  const { colors: c } = useTheme();
+
+  const cardStyle: React.CSSProperties = {
+    background: c.bgCard,
+    border: `1px solid ${c.primaryBorderLight}`,
+    borderRadius: 12,
+  };
+  const headStyle = {
+    background: 'transparent',
+    borderBottom: `1px solid ${c.primaryBorderLight}`,
+  };
+  const labelStyle: React.CSSProperties = { color: c.textSecondary, fontSize: 12 };
+  const inputStyle: React.CSSProperties = {
+    background: c.bgSider,
+    border: `1px solid ${c.primaryBorder}`,
+    color: c.textPrimary,
+  };
+  const tooltipStyle = {
+    background: c.bgElevated,
+    border: `1px solid ${c.primary}`,
+    borderRadius: 6,
+    fontSize: 12,
+  };
+
   const [cfg, setCfg] = useState<InvestmentConfig>(DEFAULT_CONFIG);
   const [activeTab, setActiveTab] = useState('1');
 
@@ -407,7 +410,7 @@ export default function InvestmentCalculator() {
   const equityAmt = +(autoTotalInv * cfg.equityRatio / 100).toFixed(2);
   const debtAmt = +(autoTotalInv * (1 - cfg.equityRatio / 100)).toFixed(2);
   const capitalPie = [
-    { name: '资本金', value: equityAmt, color: '#00d4ff' },
+    { name: '资本金', value: equityAmt, color: c.primary },
     { name: '银行贷款', value: debtAmt, color: '#ffb800' },
   ];
 
@@ -422,7 +425,7 @@ export default function InvestmentCalculator() {
 
   // 成本构成柱状图
   const costBreakdown = [
-    { name: '电池系统', value: results.batteryCapex, color: '#00d4ff' },
+    { name: '电池系统', value: results.batteryCapex, color: c.primary },
     { name: 'PCS', value: results.pcsCapex, color: '#00ff88' },
     { name: 'BMS/EMS', value: results.bmsCapex, color: '#ffb800' },
     { name: '土建安装', value: results.civilCapex, color: '#a78bfa' },
@@ -438,7 +441,7 @@ export default function InvestmentCalculator() {
     : 'fail';
 
   const irrColor: Record<string, string> = {
-    excellent: '#00ff88', pass: '#00d4ff', marginal: '#ffb800', fail: '#ff4d4d', na: '#4a6080',
+    excellent: '#00ff88', pass: c.primary, marginal: '#ffb800', fail: '#ff4d4d', na: c.textDim,
   };
   const irrLabel: Record<string, string> = {
     excellent: '优秀', pass: '达标', marginal: '勉强', fail: '不达标', na: '无法计算',
@@ -472,7 +475,7 @@ export default function InvestmentCalculator() {
   const Tab1 = (
     <Row gutter={[24, 0]}>
       <Col span={12}>
-        <Card style={cardStyle} styles={{ header: headStyle }} title={<span style={{ color: '#00d4ff' }}>项目基本信息</span>}>
+        <Card style={cardStyle} styles={{ header: headStyle }} title={<span style={{ color: c.primary }}>项目基本信息</span>}>
           <Form layout="vertical" style={{ marginTop: 8 }}>
             <Form.Item label={<span style={labelStyle}>项目名称</span>}>
               <Input value={cfg.projectName} onChange={e => set('projectName', e.target.value)} style={inputStyle} />
@@ -499,12 +502,12 @@ export default function InvestmentCalculator() {
         </Card>
       </Col>
       <Col span={12}>
-        <Card style={cardStyle} styles={{ header: headStyle }} title={<span style={{ color: '#00d4ff' }}>经济评价依据</span>}>
-          <div style={{ color: '#aab4c8', fontSize: 13, lineHeight: 2 }}>
+        <Card style={cardStyle} styles={{ header: headStyle }} title={<span style={{ color: c.primary }}>经济评价依据</span>}>
+          <div style={{ color: c.textSecondary, fontSize: 13, lineHeight: 2 }}>
             <div>• 依据 <Tag color="blue">国家发改委 2023 年储能政策</Tag> 开展经济评价</div>
             <div>• 参照 <Tag color="blue">GB/T 51161</Tag> 储能系统工程规范</div>
             <div>• 执行 <Tag color="geekblue">建设项目经济评价方法与参数（第三版）</Tag></div>
-            <div style={{ marginTop: 12, color: '#4a6080', fontSize: 12 }}>
+            <div style={{ marginTop: 12, color: c.textDim, fontSize: 12 }}>
               {cfg.storageType === 'commercial'
                 ? '工商业储能以峰谷套利为主要收益来源，辅以需求响应和容量费管理，适用于用电量大、峰谷差价显著的工商业用户。'
                 : '电网侧储能参与调峰、调频辅助服务及容量租赁市场，收益来源多元，适用于大规模独立储能项目。'}
@@ -523,8 +526,8 @@ export default function InvestmentCalculator() {
             style={{
               ...cardStyle,
               border: cfg.selectedModels.includes(m.value)
-                ? '1px solid rgba(0,212,255,0.5)'
-                : '1px solid rgba(255,255,255,0.06)',
+                ? `1px solid ${c.primary}`
+                : `1px solid ${c.borderSubtle}`,
               cursor: 'pointer',
               transition: 'all 0.2s',
             }}
@@ -538,8 +541,8 @@ export default function InvestmentCalculator() {
             <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
               <Checkbox checked={cfg.selectedModels.includes(m.value)} style={{ marginTop: 2 }} />
               <div>
-                <div style={{ color: '#e2e8f0', fontWeight: 600, fontSize: 14, marginBottom: 4 }}>{m.label}</div>
-                <div style={{ color: '#6b7280', fontSize: 12 }}>{m.desc}</div>
+                <div style={{ color: c.textPrimary, fontWeight: 600, fontSize: 14, marginBottom: 4 }}>{m.label}</div>
+                <div style={{ color: c.textMuted, fontSize: 12 }}>{m.desc}</div>
               </div>
             </div>
           </Card>
@@ -556,7 +559,7 @@ export default function InvestmentCalculator() {
   const Tab3 = (
     <Row gutter={[24, 0]}>
       <Col span={12}>
-        <Card style={cardStyle} styles={{ header: headStyle }} title={<span style={{ color: '#00d4ff' }}>财务评价参数</span>}>
+        <Card style={cardStyle} styles={{ header: headStyle }} title={<span style={{ color: c.primary }}>财务评价参数</span>}>
           <Form layout="vertical" style={{ marginTop: 8 }}>
             {[
               { label: '基准收益率（%）', key: 'benchmarkRate' as const, tip: '项目可接受的最低收益率，通常参照行业基准' },
@@ -567,7 +570,7 @@ export default function InvestmentCalculator() {
               { label: '增值税率（%）', key: 'vatRate' as const, tip: '电力销售适用增值税率' },
             ].map(({ label, key, tip }) => (
               <Form.Item key={key} label={
-                <span style={labelStyle}>{label} <Tooltip title={tip}><InfoCircleOutlined style={{ color: '#4a6080', marginLeft: 4 }} /></Tooltip></span>
+                <span style={labelStyle}>{label} <Tooltip title={tip}><InfoCircleOutlined style={{ color: c.textDim, marginLeft: 4 }} /></Tooltip></span>
               }>
                 <InputNumber
                   value={cfg[key] as number}
@@ -583,13 +586,13 @@ export default function InvestmentCalculator() {
         </Card>
       </Col>
       <Col span={12}>
-        <Card style={{ ...cardStyle, height: '100%' }} styles={{ header: headStyle }} title={<span style={{ color: '#00d4ff' }}>参数说明</span>}>
-          <div style={{ color: '#4a6080', fontSize: 12, lineHeight: 2.2 }}>
-            <div><span style={{ color: '#00d4ff' }}>基准收益率：</span>通常取 6%~10%，储能项目推荐 8%</div>
-            <div><span style={{ color: '#00d4ff' }}>计算期：</span>储能电池寿命约 10~15 年，建议与电池寿命匹配</div>
-            <div><span style={{ color: '#00d4ff' }}>折现率：</span>反映资金时间价值，通常取与基准收益率相同</div>
-            <div><span style={{ color: '#00d4ff' }}>所得税率：</span>高新技术企业可享受 15% 优惠税率</div>
-            <div><span style={{ color: '#00d4ff' }}>增值税：</span>储能参与电力市场按 9%~13% 执行，以实际税务筹划为准</div>
+        <Card style={{ ...cardStyle, height: '100%' }} styles={{ header: headStyle }} title={<span style={{ color: c.primary }}>参数说明</span>}>
+          <div style={{ color: c.textDim, fontSize: 12, lineHeight: 2.2 }}>
+            <div><span style={{ color: c.primary }}>基准收益率：</span>通常取 6%~10%，储能项目推荐 8%</div>
+            <div><span style={{ color: c.primary }}>计算期：</span>储能电池寿命约 10~15 年，建议与电池寿命匹配</div>
+            <div><span style={{ color: c.primary }}>折现率：</span>反映资金时间价值，通常取与基准收益率相同</div>
+            <div><span style={{ color: c.primary }}>所得税率：</span>高新技术企业可享受 15% 优惠税率</div>
+            <div><span style={{ color: c.primary }}>增值税：</span>储能参与电力市场按 9%~13% 执行，以实际税务筹划为准</div>
           </div>
         </Card>
       </Col>
@@ -599,7 +602,7 @@ export default function InvestmentCalculator() {
   const Tab4 = (
     <Row gutter={[16, 16]}>
       <Col span={10}>
-        <Card style={cardStyle} styles={{ header: headStyle }} title={<span style={{ color: '#00d4ff' }}>资金筹措方案</span>}>
+        <Card style={cardStyle} styles={{ header: headStyle }} title={<span style={{ color: c.primary }}>资金筹措方案</span>}>
           <Form layout="vertical" style={{ marginTop: 8 }}>
             <Form.Item label={<span style={labelStyle}>总投资额（万元，自动计算）</span>}>
               <InputNumber value={autoTotalInv} disabled style={{ ...inputStyle, width: '100%' }} addonAfter="万元" />
@@ -613,7 +616,7 @@ export default function InvestmentCalculator() {
             <Form.Item label={<span style={labelStyle}>贷款期限（年）</span>}>
               <InputNumber value={cfg.loanTerm} onChange={v => set('loanTerm', v ?? 10)} min={1} max={20} style={{ ...inputStyle, width: '100%' }} />
             </Form.Item>
-            <div style={{ color: '#aab4c8', fontSize: 12, marginTop: 8 }}>
+            <div style={{ color: c.textSecondary, fontSize: 12, marginTop: 8 }}>
               <div>资本金：<span style={{ color: '#00d4ff', fontWeight: 600 }}>¥{equityAmt} 万元</span></div>
               <div>贷款额：<span style={{ color: '#ffb800', fontWeight: 600 }}>¥{debtAmt} 万元</span></div>
             </div>
@@ -621,7 +624,7 @@ export default function InvestmentCalculator() {
         </Card>
       </Col>
       <Col span={7}>
-        <Card style={cardStyle} styles={{ header: headStyle }} title={<span style={{ color: '#00d4ff' }}>资本结构</span>}>
+        <Card style={cardStyle} styles={{ header: headStyle }} title={<span style={{ color: c.primary }}>资本结构</span>}>
           <ResponsiveContainer width="100%" height={220}>
             <PieChart>
               <Pie data={capitalPie} cx="50%" cy="50%" innerRadius={50} outerRadius={80} dataKey="value"
@@ -634,7 +637,7 @@ export default function InvestmentCalculator() {
         </Card>
       </Col>
       <Col span={7}>
-        <Card style={cardStyle} styles={{ header: headStyle }} title={<span style={{ color: '#00d4ff' }}>还款计划</span>}>
+        <Card style={cardStyle} styles={{ header: headStyle }} title={<span style={{ color: c.primary }}>还款计划</span>}>
           <div style={{ maxHeight: 250, overflowY: 'auto' }}>
             <Table
               dataSource={repayRows}
@@ -656,7 +659,7 @@ export default function InvestmentCalculator() {
   const Tab5 = (
     <Row gutter={[16, 16]}>
       <Col span={10}>
-        <Card style={cardStyle} styles={{ header: headStyle }} title={<span style={{ color: '#00d4ff' }}>电池技术参数</span>}>
+        <Card style={cardStyle} styles={{ header: headStyle }} title={<span style={{ color: c.primary }}>电池技术参数</span>}>
           <Form layout="vertical" style={{ marginTop: 8 }}>
             <Form.Item label={<span style={labelStyle}>电池类型</span>}>
               <Select value={cfg.batteryType} onChange={v => set('batteryType', v)} style={{ width: '100%' }}
@@ -683,17 +686,17 @@ export default function InvestmentCalculator() {
         </Card>
       </Col>
       <Col span={14}>
-        <Card style={cardStyle} styles={{ header: headStyle }} title={<span style={{ color: '#00d4ff' }}>容量衰减曲线（计算期内）</span>}>
+        <Card style={cardStyle} styles={{ header: headStyle }} title={<span style={{ color: c.primary }}>容量衰减曲线（计算期内）</span>}>
           <ResponsiveContainer width="100%" height={320}>
             <LineChart data={degradationData} margin={{ top: 10, right: 20, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-              <XAxis dataKey="year" stroke="#4a6080" tick={{ fontSize: 11 }} interval={Math.floor(cfg.calcPeriod / 5)} />
-              <YAxis stroke="#4a6080" tick={{ fontSize: 11 }} unit=" MWh" />
+              <CartesianGrid strokeDasharray="3 3" stroke={c.borderSubtle} />
+              <XAxis dataKey="year" stroke={c.textDim} tick={{ fontSize: 11 }} interval={Math.floor(cfg.calcPeriod / 5)} />
+              <YAxis stroke={c.textDim} tick={{ fontSize: 11 }} unit=" MWh" />
               <RTooltip contentStyle={tooltipStyle} formatter={(v: unknown) => [`${Number(v).toFixed(2)} MWh`, '有效容量']} />
-              <Line type="monotone" dataKey="capacity" stroke="#00d4ff" strokeWidth={2} dot={false} />
+              <Line type="monotone" dataKey="capacity" stroke={c.primary} strokeWidth={2} dot={false} />
             </LineChart>
           </ResponsiveContainer>
-          <div style={{ color: '#4a6080', fontSize: 11, marginTop: 8, textAlign: 'center' }}>
+          <div style={{ color: c.textDim, fontSize: 11, marginTop: 8, textAlign: 'center' }}>
             初始容量 {cfg.ratedCapacity} MWh → 期末容量 {degradationData[degradationData.length - 1]?.capacity ?? 0} MWh
             （年衰减 {cfg.annualDegradation}%）
           </div>
@@ -705,7 +708,7 @@ export default function InvestmentCalculator() {
   const Tab6 = (
     <Row gutter={[16, 16]}>
       <Col span={10}>
-        <Card style={cardStyle} styles={{ header: headStyle }} title={<span style={{ color: '#00d4ff' }}>初始投资（元/kWh 或 元/kW）</span>}>
+        <Card style={cardStyle} styles={{ header: headStyle }} title={<span style={{ color: c.primary }}>初始投资（元/kWh 或 元/kW）</span>}>
           <Form layout="vertical" style={{ marginTop: 8 }}>
             {[
               { label: '电池系统（元/kWh）', key: 'batteryCostPerKwh' as const },
@@ -730,7 +733,7 @@ export default function InvestmentCalculator() {
         </Card>
       </Col>
       <Col span={7}>
-        <Card style={cardStyle} styles={{ header: headStyle }} title={<span style={{ color: '#00d4ff' }}>年运营成本</span>}>
+        <Card style={cardStyle} styles={{ header: headStyle }} title={<span style={{ color: c.primary }}>年运营成本</span>}>
           <Form layout="vertical" style={{ marginTop: 8 }}>
             {[
               { label: '年运维费率（%）', key: 'annualOmRate' as const, step: 0.1 },
@@ -748,7 +751,7 @@ export default function InvestmentCalculator() {
                 />
               </Form.Item>
             ))}
-            <div style={{ color: '#aab4c8', fontSize: 12, marginTop: 8 }}>
+            <div style={{ color: c.textSecondary, fontSize: 12, marginTop: 8 }}>
               年运营成本约：<span style={{ color: '#ffb800' }}>
                 ¥{(autoTotalInv * (cfg.annualOmRate + cfg.insuranceRate) / 100 + cfg.annualRent).toFixed(2)} 万元
               </span>
@@ -757,11 +760,11 @@ export default function InvestmentCalculator() {
         </Card>
       </Col>
       <Col span={7}>
-        <Card style={cardStyle} styles={{ header: headStyle }} title={<span style={{ color: '#00d4ff' }}>投资构成</span>}>
+        <Card style={cardStyle} styles={{ header: headStyle }} title={<span style={{ color: c.primary }}>投资构成</span>}>
           <ResponsiveContainer width="100%" height={250}>
             <BarChart data={costBreakdown} layout="vertical" margin={{ left: 10, right: 20 }}>
-              <XAxis type="number" stroke="#4a6080" tick={{ fontSize: 11 }} unit="万" />
-              <YAxis type="category" dataKey="name" stroke="#4a6080" tick={{ fontSize: 11 }} width={60} />
+              <XAxis type="number" stroke={c.textDim} tick={{ fontSize: 11 }} unit="万" />
+              <YAxis type="category" dataKey="name" stroke={c.textDim} tick={{ fontSize: 11 }} width={60} />
               <RTooltip contentStyle={tooltipStyle} formatter={(v: unknown) => [`¥${Number(v).toFixed(1)}万`, '']} />
               <Bar dataKey="value" radius={[0, 4, 4, 0]}>
                 {costBreakdown.map((entry, i) => <Cell key={i} fill={entry.color} />)}
@@ -871,7 +874,7 @@ export default function InvestmentCalculator() {
           <Card style={cardStyle} styles={{ header: headStyle }}
             title={
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span style={{ color: '#00d4ff' }}>各模式收益参数配置</span>
+                <span style={{ color: c.primary }}>各模式收益参数配置</span>
                 <div style={{ display: 'flex', gap: 6 }}>
                   {selectedModelLabels.map((l, i) => (
                     <Tag key={l} style={{ background: `${Object.values(modelColors)[i % 7]}18`, border: `1px solid ${Object.values(modelColors)[i % 7]}55`, color: Object.values(modelColors)[i % 7] }}>{l}</Tag>
@@ -884,12 +887,12 @@ export default function InvestmentCalculator() {
               {paramGroups.map(group => (
                 <Col key={group.model} span={Math.max(6, Math.min(8, Math.round(24 / paramGroups.length)))}>
                   <div style={{
-                    background: '#0a0e1a',
-                    border: `1px solid ${modelColors[group.model] ?? '#00d4ff'}30`,
+                    background: c.bgPage,
+                    border: `1px solid ${modelColors[group.model] ?? c.primary}30`,
                     borderRadius: 8,
                     padding: '10px 12px',
                   }}>
-                    <div style={{ color: modelColors[group.model] ?? '#00d4ff', fontSize: 12, fontWeight: 600, marginBottom: 10, borderBottom: `1px solid ${modelColors[group.model] ?? '#00d4ff'}20`, paddingBottom: 6 }}>
+                    <div style={{ color: modelColors[group.model] ?? c.primary, fontSize: 12, fontWeight: 600, marginBottom: 10, borderBottom: `1px solid ${modelColors[group.model] ?? c.primary}20`, paddingBottom: 6 }}>
                       {group.label}
                     </div>
                     {group.fields.map(f => (
@@ -906,8 +909,8 @@ export default function InvestmentCalculator() {
                         />
                       </div>
                     ))}
-                    <div style={{ color: '#4a6080', fontSize: 11, marginTop: 6, borderTop: `1px solid rgba(255,255,255,0.04)`, paddingTop: 6 }}>
-                      首年收益：<span style={{ color: modelColors[group.model] ?? '#00d4ff', fontWeight: 600 }}>
+                    <div style={{ color: c.textDim, fontSize: 11, marginTop: 6, borderTop: `1px solid rgba(255,255,255,0.04)`, paddingTop: 6 }}>
+                      首年收益：<span style={{ color: modelColors[group.model] ?? c.primary, fontWeight: 600 }}>
                         ¥{typeof year1[group.model] === 'number' ? (year1[group.model] as number).toFixed(2) : '0.00'} 万
                       </span>
                     </div>
@@ -920,7 +923,7 @@ export default function InvestmentCalculator() {
 
         {/* 首年收益构成饼图 */}
         <Col span={8}>
-          <Card style={cardStyle} styles={{ header: headStyle }} title={<span style={{ color: '#00d4ff' }}>首年收益构成</span>}>
+          <Card style={cardStyle} styles={{ header: headStyle }} title={<span style={{ color: c.primary }}>首年收益构成</span>}>
             <ResponsiveContainer width="100%" height={220}>
               <PieChart>
                 <Pie data={pieData} cx="50%" cy="50%" innerRadius={45} outerRadius={80} dataKey="value"
@@ -935,11 +938,11 @@ export default function InvestmentCalculator() {
               {pieData.map(d => (
                 <div key={d.name} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11 }}>
                   <span style={{ color: d.color }}>● {d.name}</span>
-                  <span style={{ color: '#e2e8f0' }}>¥{d.value.toFixed(2)} 万</span>
+                  <span style={{ color: c.textPrimary }}>¥{d.value.toFixed(2)} 万</span>
                 </div>
               ))}
               <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, borderTop: '1px solid rgba(255,255,255,0.06)', paddingTop: 4, marginTop: 2 }}>
-                <span style={{ color: '#6b7280' }}>合计</span>
+                <span style={{ color: c.textMuted }}>合计</span>
                 <span style={{ color: '#00ff88', fontWeight: 600 }}>¥{pieData.reduce((s, d) => s + d.value, 0).toFixed(2)} 万</span>
               </div>
             </div>
@@ -948,12 +951,12 @@ export default function InvestmentCalculator() {
 
         {/* 分模式逐年收益堆叠图 */}
         <Col span={16}>
-          <Card style={cardStyle} styles={{ header: headStyle }} title={<span style={{ color: '#00d4ff' }}>各模式逐年收益拆解（堆叠）</span>}>
+          <Card style={cardStyle} styles={{ header: headStyle }} title={<span style={{ color: c.primary }}>各模式逐年收益拆解（堆叠）</span>}>
             <ResponsiveContainer width="100%" height={260}>
               <BarChart data={breakdownData} margin={{ top: 10, right: 16, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-                <XAxis dataKey="year" stroke="#4a6080" tick={{ fontSize: 9 }} interval={Math.floor(cfg.calcPeriod / 6)} />
-                <YAxis stroke="#4a6080" tick={{ fontSize: 11 }} unit="万" />
+                <CartesianGrid strokeDasharray="3 3" stroke={c.borderSubtle} />
+                <XAxis dataKey="year" stroke={c.textDim} tick={{ fontSize: 9 }} interval={Math.floor(cfg.calcPeriod / 6)} />
+                <YAxis stroke={c.textDim} tick={{ fontSize: 11 }} unit="万" />
                 <RTooltip contentStyle={tooltipStyle} formatter={(v: unknown) => [`¥${Number(v).toFixed(2)}万`, '']} />
                 <Legend wrapperStyle={{ fontSize: 11 }} />
                 {cfg.selectedModels.map(m => (
@@ -967,7 +970,7 @@ export default function InvestmentCalculator() {
 
         {/* 逐年明细表 */}
         <Col span={24}>
-          <Card style={cardStyle} styles={{ header: headStyle }} title={<span style={{ color: '#00d4ff' }}>逐年现金流明细</span>}>
+          <Card style={cardStyle} styles={{ header: headStyle }} title={<span style={{ color: c.primary }}>逐年现金流明细</span>}>
             <Table
               dataSource={results.yearlyRows}
               columns={yearlyColumns}
@@ -1022,7 +1025,7 @@ export default function InvestmentCalculator() {
             <Col key={item.label} span={4}>
               <Card style={cardStyle} styles={{ body: { padding: '14px 16px' } }}>
                 <Tooltip title={item.tip}>
-                  <div style={{ color: '#4a6080', fontSize: 11, marginBottom: 4, cursor: 'help' }}>
+                  <div style={{ color: c.textDim, fontSize: 11, marginBottom: 4, cursor: 'help' }}>
                     {item.label} <InfoCircleOutlined style={{ fontSize: 10 }} />
                   </div>
                 </Tooltip>
@@ -1035,7 +1038,7 @@ export default function InvestmentCalculator() {
 
       {/* 综合评价徽章 + 项目概况汇总表 */}
       <Col span={6}>
-        <Card style={cardStyle} styles={{ header: headStyle }} title={<span style={{ color: '#00d4ff' }}>综合评价</span>}>
+        <Card style={cardStyle} styles={{ header: headStyle }} title={<span style={{ color: c.primary }}>综合评价</span>}>
           <div style={{ textAlign: 'center', padding: '16px 0 12px' }}>
             <div style={{
               width: 90, height: 90, borderRadius: '50%', margin: '0 auto 12px',
@@ -1045,7 +1048,7 @@ export default function InvestmentCalculator() {
             }}>
               {irrLabel[irrRating]}
             </div>
-            <div style={{ color: '#aab4c8', fontSize: 12 }}>
+            <div style={{ color: c.textSecondary, fontSize: 12 }}>
               {irrRating === 'excellent' && `IRR ${results.irr}% 远高于基准`}
               {irrRating === 'pass' && `IRR ${results.irr}% ≥ 基准 ${cfg.benchmarkRate}%`}
               {irrRating === 'marginal' && `IRR ${results.irr}% 略低于基准`}
@@ -1060,7 +1063,7 @@ export default function InvestmentCalculator() {
               { label: '项目 NPV', val: `¥${isNaN(results.npv) ? '-' : results.npv.toFixed(1)}万`, color: results.npv >= 0 ? '#00ff88' : '#ff4d4d' },
             ].map(r => (
               <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 6 }}>
-                <span style={{ color: '#4a6080' }}>{r.label}</span>
+                <span style={{ color: c.textDim }}>{r.label}</span>
                 <span style={{ color: r.color ?? '#e2e8f0', fontWeight: 600 }}>{r.val}</span>
               </div>
             ))}
@@ -1070,12 +1073,12 @@ export default function InvestmentCalculator() {
 
       {/* 投资回报汇总表格 */}
       <Col span={18}>
-        <Card style={cardStyle} styles={{ header: headStyle }} title={<span style={{ color: '#00d4ff' }}>投资回报汇总表</span>}>
+        <Card style={cardStyle} styles={{ header: headStyle }} title={<span style={{ color: c.primary }}>投资回报汇总表</span>}>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <tbody>
               {summaryTableData.map((row, i) => (
                 <tr key={row.key} style={{ background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)' }}>
-                  <td style={{ padding: '8px 16px', color: '#6b7280', width: '45%', borderBottom: '1px solid rgba(255,255,255,0.04)', whiteSpace: 'nowrap' }}>
+                  <td style={{ padding: '8px 16px', color: c.textMuted, width: '45%', borderBottom: '1px solid rgba(255,255,255,0.04)', whiteSpace: 'nowrap' }}>
                     {row.label}
                   </td>
                   <td style={{ padding: '8px 16px', borderBottom: '1px solid rgba(255,255,255,0.04)', fontWeight: row.highlight ? 600 : 400 }}>
@@ -1090,12 +1093,12 @@ export default function InvestmentCalculator() {
 
       {/* 年度收益 vs 成本 柱状图 */}
       <Col span={12}>
-        <Card style={cardStyle} styles={{ header: headStyle }} title={<span style={{ color: '#00d4ff' }}>逐年收益与成本对比</span>}>
+        <Card style={cardStyle} styles={{ header: headStyle }} title={<span style={{ color: c.primary }}>逐年收益与成本对比</span>}>
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={results.yearlyRows} margin={{ top: 10, right: 16, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-              <XAxis dataKey="year" stroke="#4a6080" tick={{ fontSize: 9 }} interval={Math.floor(cfg.calcPeriod / 6)} />
-              <YAxis stroke="#4a6080" tick={{ fontSize: 11 }} unit="万" />
+              <CartesianGrid strokeDasharray="3 3" stroke={c.borderSubtle} />
+              <XAxis dataKey="year" stroke={c.textDim} tick={{ fontSize: 9 }} interval={Math.floor(cfg.calcPeriod / 6)} />
+              <YAxis stroke={c.textDim} tick={{ fontSize: 11 }} unit="万" />
               <RTooltip contentStyle={tooltipStyle} formatter={(v: unknown) => [`¥${Number(v).toFixed(1)}万`, '']} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
               <Bar dataKey="revenue" name="年收益" fill="#00ff88" radius={[3, 3, 0, 0]} />
@@ -1108,12 +1111,12 @@ export default function InvestmentCalculator() {
 
       {/* 累计现金流折线图 */}
       <Col span={12}>
-        <Card style={cardStyle} styles={{ header: headStyle }} title={<span style={{ color: '#00d4ff' }}>累计现金流曲线（含回收期判断）</span>}>
+        <Card style={cardStyle} styles={{ header: headStyle }} title={<span style={{ color: c.primary }}>累计现金流曲线（含回收期判断）</span>}>
           <ResponsiveContainer width="100%" height={260}>
             <LineChart data={results.yearlyRows} margin={{ top: 10, right: 16, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
-              <XAxis dataKey="year" stroke="#4a6080" tick={{ fontSize: 9 }} interval={Math.floor(cfg.calcPeriod / 6)} />
-              <YAxis stroke="#4a6080" tick={{ fontSize: 11 }} unit="万" />
+              <CartesianGrid strokeDasharray="3 3" stroke={c.borderSubtle} />
+              <XAxis dataKey="year" stroke={c.textDim} tick={{ fontSize: 9 }} interval={Math.floor(cfg.calcPeriod / 6)} />
+              <YAxis stroke={c.textDim} tick={{ fontSize: 11 }} unit="万" />
               <RTooltip contentStyle={tooltipStyle} formatter={(v: unknown) => [`¥${Number(v).toFixed(1)}万`, '']} />
               <ReferenceLine y={0} stroke="#ffb800" strokeDasharray="4 4" label={{ value: '回收', fill: '#ffb800', fontSize: 10, position: 'insideRight' }} />
               <Legend wrapperStyle={{ fontSize: 11 }} />
@@ -1152,7 +1155,7 @@ export default function InvestmentCalculator() {
     return (
       <Row gutter={[16, 16]}>
         <Col span={24}>
-          <Card style={cardStyle} styles={{ header: headStyle }} title={<span style={{ color: '#00d4ff' }}>NPV 敏感性分析（万元）</span>}>
+          <Card style={cardStyle} styles={{ header: headStyle }} title={<span style={{ color: c.primary }}>NPV 敏感性分析（万元）</span>}>
             <Table
               dataSource={sensitivity}
               columns={sensColumns}
@@ -1162,12 +1165,12 @@ export default function InvestmentCalculator() {
           </Card>
         </Col>
         <Col span={24}>
-          <Card style={cardStyle} styles={{ header: headStyle }} title={<span style={{ color: '#00d4ff' }}>龙卷风图（NPV 对各参数±20%变化的响应）</span>}>
+          <Card style={cardStyle} styles={{ header: headStyle }} title={<span style={{ color: c.primary }}>龙卷风图（NPV 对各参数±20%变化的响应）</span>}>
             <ResponsiveContainer width="100%" height={220}>
               <BarChart data={tornadoData} layout="vertical" margin={{ left: 30, right: 30, top: 10, bottom: 10 }}>
-                <XAxis type="number" stroke="#4a6080" tick={{ fontSize: 11 }} unit="万" />
-                <YAxis type="category" dataKey="parameter" stroke="#4a6080" tick={{ fontSize: 12 }} width={100} />
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                <XAxis type="number" stroke={c.textDim} tick={{ fontSize: 11 }} unit="万" />
+                <YAxis type="category" dataKey="parameter" stroke={c.textDim} tick={{ fontSize: 12 }} width={100} />
+                <CartesianGrid strokeDasharray="3 3" stroke={c.borderSubtle} />
                 <RTooltip contentStyle={tooltipStyle} formatter={(v: unknown) => [`NPV: ¥${Number(v).toFixed(1)}万`, '']} />
                 <Legend />
                 <Bar dataKey="low" name="-20%情景" fill="#ff4d4d" radius={[0, 2, 2, 0]} />
@@ -1186,7 +1189,7 @@ export default function InvestmentCalculator() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <div>
           <h2 style={{ color: '#00d4ff', margin: 0, fontSize: 20, letterSpacing: 1 }}>储能投资测算</h2>
-          <p style={{ color: '#4a6080', margin: '4px 0 0', fontSize: 12 }}>
+          <p style={{ color: c.textDim, margin: '4px 0 0', fontSize: 12 }}>
             {cfg.storageType === 'commercial' ? '工商业储能' : '电网侧储能'} · {cfg.projectName} · 总投资 ¥{autoTotalInv} 万元
           </p>
         </div>
@@ -1199,7 +1202,7 @@ export default function InvestmentCalculator() {
             ].map(item => (
               <Col key={item.label}>
                 <Statistic
-                  title={<span style={{ color: '#4a6080', fontSize: 11 }}>{item.label}</span>}
+                  title={<span style={{ color: c.textDim, fontSize: 11 }}>{item.label}</span>}
                   value={item.value}
                   valueStyle={{ color: item.color, fontSize: 16, fontWeight: 700 }}
                 />
@@ -1209,7 +1212,7 @@ export default function InvestmentCalculator() {
           <Button
             icon={<DownloadOutlined />}
             onClick={handleExport}
-            style={{ borderColor: 'rgba(0,212,255,0.3)', color: '#aab4c8' }}
+            style={{ borderColor: 'rgba(0,212,255,0.3)', color: c.textSecondary }}
           >
             导出报告
           </Button>
