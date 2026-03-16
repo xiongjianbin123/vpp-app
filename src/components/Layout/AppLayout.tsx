@@ -5,6 +5,7 @@ import {
   DashboardOutlined, ThunderboltOutlined, ApartmentOutlined, DollarOutlined,
   BellOutlined, UserOutlined, LogoutOutlined, SettingOutlined, IdcardOutlined,
   CheckCircleOutlined, WarningOutlined, InfoCircleOutlined, LineChartOutlined,
+  RocketOutlined, SafetyCertificateOutlined,
 } from '@ant-design/icons';
 import huitoneLogo from '/Huitone-logo.png';
 
@@ -15,6 +16,8 @@ const menuItems = [
   { key: '/devices', icon: <ApartmentOutlined />, label: '设备资产' },
   { key: '/demand-response', icon: <ThunderboltOutlined />, label: '需求响应' },
   { key: '/spot-market', icon: <LineChartOutlined />, label: '现货交易' },
+  { key: '/smart-bidding', icon: <RocketOutlined />, label: '智能申报' },
+  { key: '/compliance-control', icon: <SafetyCertificateOutlined />, label: 'AGC合规' },
   { key: '/revenue', icon: <DollarOutlined />, label: '收益结算' },
 ];
 
@@ -23,6 +26,8 @@ const pageNames: Record<string, string> = {
   '/devices': '设备资产管理',
   '/demand-response': '需求响应管理',
   '/spot-market': '现货市场交易策略',
+  '/smart-bidding': '智能申报与收益寻优',
+  '/compliance-control': '合规接入与AGC直控监控',
   '/revenue': '收益结算',
 };
 

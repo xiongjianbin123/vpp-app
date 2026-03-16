@@ -7,6 +7,8 @@ import Devices from './pages/Devices';
 import DemandResponse from './pages/DemandResponse';
 import Revenue from './pages/Revenue';
 import SpotMarket from './pages/SpotMarket';
+import SmartBidding from './pages/SmartBidding';
+import ComplianceControl from './pages/ComplianceControl';
 
 const darkTheme = {
   algorithm: theme.darkAlgorithm,
@@ -49,6 +51,8 @@ export default function App() {
             <Route path="/demand-response" element={<DemandResponse />} />
             <Route path="/revenue" element={<Revenue />} />
             <Route path="/spot-market" element={<SpotMarket />} />
+            <Route path="/smart-bidding" element={<SmartBidding />} />
+            <Route path="/compliance-control" element={<ComplianceControl />} />
           </Routes>
         </AppLayout>
       </HashRouter>
