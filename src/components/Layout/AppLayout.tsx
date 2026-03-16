@@ -48,7 +48,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <span style={{ fontSize: 22, marginRight: collapsed ? 0 : 10 }}>⚡</span>
           {!collapsed && (
             <span style={{ color: '#00d4ff', fontWeight: 700, fontSize: 15, letterSpacing: 1 }}>
-              虚拟电厂平台
+              Guangzhou HuiTone Technology
             </span>
           )}
         </div>
