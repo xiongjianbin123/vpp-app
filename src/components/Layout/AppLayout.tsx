@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Layout, Menu, Badge, Drawer, Avatar, Dropdown, List, Tooltip } from 'antd';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
@@ -6,12 +6,13 @@ import {
   BellOutlined, UserOutlined, LogoutOutlined, SettingOutlined, IdcardOutlined,
   CheckCircleOutlined, WarningOutlined, InfoCircleOutlined, LineChartOutlined,
   RocketOutlined, SafetyCertificateOutlined, BookOutlined, CalculatorOutlined,
-  BulbOutlined, BulbFilled,
+  BulbOutlined, BulbFilled, MacCommandOutlined,
 } from '@ant-design/icons';
 import huitoneLogo from '/Huitone-logo.png';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
 import { roles } from '../../mock/users';
+import CommandPalette from '../CommandPalette';
 
 const { Sider, Header, Content } = Layout;
 
@@ -60,10 +61,22 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [noticeOpen, setNoticeOpen] = useState(false);
   const [notices, setNotices] = useState<Notice[]>(initialNotices);
+  const [paletteOpen, setPaletteOpen] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout, canAccess } = useAuth();
   const { mode, tone, colors: c, toggleTheme, toggleTone } = useTheme();
+
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        setPaletteOpen(true);
+      }
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, []);
 
   const menuItems = allMenuItems.filter(item => canAccess(item.key));
   const unreadCount = notices.filter(n => !n.read).length;
@@ -189,6 +202,23 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </div>
 
           <div style={{ display: 'flex', alignItems: 'center', gap: 20 }}>
+            {/* Command Palette Button */}
+            <Tooltip title="命令面板 (Ctrl+K)">
+              <div
+                onClick={() => setPaletteOpen(true)}
+                style={{
+                  display: 'flex', alignItems: 'center', gap: 5,
+                  padding: '3px 10px', borderRadius: 13,
+                  border: `1px solid ${c.primaryBorder}`, background: c.primaryMuted,
+                  cursor: 'pointer', fontSize: 11, color: c.primary, fontWeight: 600,
+                  letterSpacing: 0.5, userSelect: 'none',
+                }}
+              >
+                <MacCommandOutlined style={{ fontSize: 12 }} />
+                命令面板
+              </div>
+            </Tooltip>
+
             {/* Tone Toggle */}
             <Tooltip title={tone === 'blue' ? '切换能源绿色调' : '切换科技蓝色调'}>
               <div
@@ -299,6 +329,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           {children}
         </Content>
       </Layout>
+
+      {/* Command Palette */}
+      <CommandPalette open={paletteOpen} onClose={() => setPaletteOpen(false)} />
 
       {/* Notification Drawer */}
       <Drawer

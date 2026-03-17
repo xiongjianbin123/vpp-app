@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "dev:agent": "concurrently \"npm run dev\" \"python agent-harness/vppapp_api.py\""
   },
   "dependencies": {
     "@ant-design/icons": "^6.1.0",
@@ -31,6 +32,7 @@
     "globals": "^17.4.0",
     "typescript": "~5.9.3",
     "typescript-eslint": "^8.56.1",
+    "concurrently": "^9.0.0",
     "vite": "^8.0.0"
   }
 }
