@@ -1,0 +1,2 @@
+[console_scripts]
+cli-anything-vppapp = cli_anything.vppapp.vppapp_cli:main
