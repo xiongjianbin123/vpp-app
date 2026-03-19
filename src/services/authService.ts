@@ -1,4 +1,4 @@
-import api from './api';
+import { mockUsers, roles } from '../mock/users';
 
 export interface UserInfo {
   username: string;
@@ -15,15 +15,22 @@ export interface LoginResponse {
 }
 
 export async function login(username: string, password: string): Promise<LoginResponse> {
-  const res = await api.post<{ success: boolean; data: LoginResponse; message: string }>(
-    '/auth/login',
-    { username, password }
-  );
-  if (!res.data.success) throw new Error(res.data.message || '登录失败');
-  return res.data.data;
+  const found = mockUsers.find(u => u.username === username && u.password === password);
+  if (!found) throw new Error('用户名或密码错误');
+  const role = roles[found.roleKey];
+  const user: UserInfo = {
+    username: found.username,
+    name: found.name,
+    email: found.email,
+    roleKey: found.roleKey,
+    roleLabel: role.label,
+    allowedRoutes: role.allowedRoutes,
+  };
+  return { token: `mock-token-${username}`, user };
 }
 
 export async function getMe(): Promise<UserInfo> {
-  const res = await api.get<{ success: boolean; data: UserInfo }>('/auth/me');
-  return res.data.data;
+  const stored = localStorage.getItem('vpp_auth_user');
+  if (!stored) throw new Error('未登录');
+  return JSON.parse(stored) as UserInfo;
 }
