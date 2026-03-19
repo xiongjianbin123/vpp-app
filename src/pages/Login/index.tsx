@@ -17,8 +17,7 @@ export default function Login() {
   const handleFinish = async ({ username, password }: { username: string; password: string }) => {
     setLoading(true);
     setError(false);
-    await new Promise(r => setTimeout(r, 500));
-    const ok = login(username, password);
+    const ok = await login(username, password);
     setLoading(false);
     if (ok) {
       navigate('/');

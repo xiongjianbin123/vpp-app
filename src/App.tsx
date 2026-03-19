@@ -13,6 +13,8 @@ import SmartBidding from './pages/SmartBidding';
 import ComplianceControl from './pages/ComplianceControl';
 import KnowledgeBase from './pages/KnowledgeBase';
 import InvestmentCalculator from './pages/InvestmentCalculator';
+import ContractSigning from './pages/ContractSigning';
+import CustomerService from './pages/CustomerService';
 import Login from './pages/Login';
 
 // Redirect to /login if not authenticated
@@ -121,6 +123,12 @@ function ThemedApp() {
                     } />
                     <Route path="/investment" element={
                       <ProtectedRoute path="/investment"><InvestmentCalculator /></ProtectedRoute>
+                    } />
+                    <Route path="/contract" element={
+                      <ProtectedRoute path="/contract"><ContractSigning /></ProtectedRoute>
+                    } />
+                    <Route path="/customer-service" element={
+                      <ProtectedRoute path="/customer-service"><CustomerService /></ProtectedRoute>
                     } />
                   </Routes>
                 </AppLayout>

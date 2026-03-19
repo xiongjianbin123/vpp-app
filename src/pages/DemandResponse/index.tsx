@@ -1,8 +1,8 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Row, Col, Card, Table, Tag, Button, Progress, Modal, Form, Input, Select,
   DatePicker, InputNumber, Badge, Drawer, Descriptions, Timeline, message } from 'antd';
 import { PlusOutlined, ThunderboltOutlined, StopOutlined, InfoCircleOutlined } from '@ant-design/icons';
-import { mockTasks } from '../../mock/data';
+import * as taskService from '../../services/taskService';
 import type { DemandResponseTask } from '../../mock/data';
 import type { ColumnType } from 'antd/es/table';
 import { useTheme } from '../../context/ThemeContext';
@@ -31,10 +31,14 @@ const poolResources = [
 
 export default function DemandResponse() {
   const { colors: c } = useTheme();
-  const [tasks, setTasks] = useState<DemandResponseTask[]>(mockTasks);
+  const [tasks, setTasks] = useState<DemandResponseTask[]>([]);
   const [modalOpen, setModalOpen] = useState(false);
   const [detailTask, setDetailTask] = useState<DemandResponseTask | null>(null);
   const [form] = Form.useForm();
+
+  useEffect(() => {
+    taskService.getTasks().then(setTasks).catch(() => {});
+  }, []);
 
   const executing = tasks.filter(t => t.status === '执行中');
   const pending = tasks.filter(t => t.status === '待响应');
@@ -48,9 +52,8 @@ export default function DemandResponse() {
       cancelText: '返回',
       okButtonProps: { style: { background: c.danger, border: 'none', color: '#fff' } },
       onOk: () => {
-        setTasks(prev => prev.map(t =>
-          t.id === task.id ? { ...t, status: '已取消' as const } : t
-        ));
+        taskService.updateTask(task.id, { ...task, status: '已取消' })
+          .then(updated => setTasks(prev => prev.map(t => t.id === updated.id ? updated : t)));
         message.success(`任务 ${task.name} 已取消`);
         if (detailTask?.id === task.id) setDetailTask(null);
       },
@@ -150,22 +153,21 @@ export default function DemandResponse() {
   ];
 
   const handleCreateTask = (values: Record<string, unknown>) => {
-    const newTask: DemandResponseTask = {
-      id: `T${String(tasks.length + 1).padStart(3, '0')}`,
+    const payload = {
       name: values.name as string,
       type: values.type as DemandResponseTask['type'],
-      status: '待响应',
       targetPower: values.targetPower as number,
       currentPower: 0,
       startTime: (values.startTime as { format: (f: string) => string }).format('YYYY-MM-DD HH:mm'),
       endTime: (values.endTime as { format: (f: string) => string }).format('YYYY-MM-DD HH:mm'),
-      progress: 0,
       reward: Math.round((values.targetPower as number) * 2000),
     };
-    setTasks([newTask, ...tasks]);
-    setModalOpen(false);
-    form.resetFields();
-    message.success('任务已创建，等待调度确认');
+    taskService.createTask(payload).then(created => {
+      setTasks(prev => [created, ...prev]);
+      setModalOpen(false);
+      form.resetFields();
+      message.success('任务已创建，等待调度确认');
+    }).catch(() => message.error('创建失败'));
   };
 
   return (

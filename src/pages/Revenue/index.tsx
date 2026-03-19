@@ -1,18 +1,17 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Row, Col, Card, Table, Button, Statistic, Tag, DatePicker, message } from 'antd';
 import { DownloadOutlined, FilterOutlined } from '@ant-design/icons';
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
   LineChart, Line,
 } from 'recharts';
-import { generateMonthlyRevenue } from '../../mock/data';
+import { getMonthlyRevenue } from '../../services/revenueService';
 import { useTheme } from '../../context/ThemeContext';
 import type { ColumnType } from 'antd/es/table';
 import type { Dayjs } from 'dayjs';
 
 const { RangePicker } = DatePicker;
 
-const monthlyData = generateMonthlyRevenue();
 
 interface SubsidyItem {
   key: string;
@@ -65,6 +64,19 @@ function exportCsv(data: SubsidyItem[]) {
 export default function Revenue() {
   const { colors: c } = useTheme();
   const [dateRange, setDateRange] = useState<[Dayjs | null, Dayjs | null] | null>(null);
+  const [monthlyData, setMonthlyData] = useState<Array<{ month: string; 调峰收益: number; 调频收益: number; 辅助服务: number; 总收益: number }>>([]);
+
+  useEffect(() => {
+    getMonthlyRevenue().then(records => {
+      setMonthlyData(records.map(r => ({
+        month: r.month,
+        调峰收益: r.peakRevenue,
+        调频收益: r.freqRevenue,
+        辅助服务: r.auxRevenue,
+        总收益: r.totalRevenue,
+      })));
+    }).catch(() => {});
+  }, []);
 
   const subsidyData = dateRange && dateRange[0] && dateRange[1]
     ? allSubsidyData.filter(d => {

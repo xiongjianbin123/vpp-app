@@ -6,12 +6,11 @@ import {
   BellOutlined, UserOutlined, LogoutOutlined, SettingOutlined, IdcardOutlined,
   CheckCircleOutlined, WarningOutlined, InfoCircleOutlined, LineChartOutlined,
   RocketOutlined, SafetyCertificateOutlined, BookOutlined, CalculatorOutlined,
-  BulbOutlined, BulbFilled, MacCommandOutlined,
+  BulbOutlined, BulbFilled, MacCommandOutlined, FileProtectOutlined, CustomerServiceOutlined,
 } from '@ant-design/icons';
 import huitoneLogo from '/Huitone-logo.png';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
-import { roles } from '../../mock/users';
 import CommandPalette from '../CommandPalette';
 
 const { Sider, Header, Content } = Layout;
@@ -26,6 +25,8 @@ const allMenuItems = [
   { key: '/revenue', icon: <DollarOutlined />, label: '收益结算' },
   { key: '/knowledge', icon: <BookOutlined />, label: '知识库' },
   { key: '/investment', icon: <CalculatorOutlined />, label: '投资测算' },
+  { key: '/contract', icon: <FileProtectOutlined />, label: '合同签署' },
+  { key: '/customer-service', icon: <CustomerServiceOutlined />, label: '客户服务' },
 ];
 
 const pageNames: Record<string, string> = {
@@ -38,6 +39,8 @@ const pageNames: Record<string, string> = {
   '/revenue': '收益结算',
   '/knowledge': '知识库与智能问答',
   '/investment': '储能投资测算',
+  '/contract': '合同签署管理',
+  '/customer-service': '客户服务中心',
 };
 
 interface Notice {
@@ -117,7 +120,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const roleLabel = user ? roles[user.roleKey].label : '';
+  const roleLabel = user?.roleLabel ?? '';
 
   return (
     <Layout style={{ minHeight: '100vh', background: c.bgPage, transition: 'background 0.25s' }}>

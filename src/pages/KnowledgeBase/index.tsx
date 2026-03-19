@@ -13,7 +13,7 @@ import {
 import { streamAI, loadAIConfig, AI_PROVIDERS } from '../../services/aiService';
 import type { AIConfig } from '../../services/aiService';
 import AIModelSelector from '../../components/AIModelSelector';
-import { mockNews } from '../../mock/data';
+import { getNews } from '../../services/newsService';
 import type { NewsItem } from '../../mock/data';
 import { generateMockExcerpt, generateMockTags } from '../../mock/data';
 import { useTheme } from '../../context/ThemeContext';
@@ -88,17 +88,6 @@ function saveDocs(docs: KnowledgeDoc[]) {
   localStorage.setItem('vpp_knowledge_docs', JSON.stringify(docs));
 }
 
-// Shuffle array with a numeric seed (deterministic per minute)
-function seededShuffle<T>(arr: T[], seed: number): T[] {
-  const copy = [...arr];
-  let s = seed;
-  for (let i = copy.length - 1; i > 0; i--) {
-    s = (s * 1664525 + 1013904223) & 0xffffffff;
-    const j = Math.abs(s) % (i + 1);
-    [copy[i], copy[j]] = [copy[j], copy[i]];
-  }
-  return copy;
-}
 
 // ─── RAG System Prompt ────────────────────────────────────────────────────────
 
@@ -187,10 +176,12 @@ export default function KnowledgeBase() {
     return <FileTextOutlined style={{ color: c.textSecondary, fontSize: 16 }} />;
   };
   // News
-  const [news, setNews] = useState<NewsItem[]>(() =>
-    seededShuffle(mockNews, Math.floor(Date.now() / 60000))
-  );
+  const [news, setNews] = useState<NewsItem[]>([]);
   const [lastRefresh, setLastRefresh] = useState(new Date().toLocaleTimeString('zh-CN'));
+
+  useEffect(() => {
+    getNews().then(setNews).catch(() => {});
+  }, []);
   const [selectedNews, setSelectedNews] = useState<NewsItem | null>(null);
 
   // Documents
@@ -211,8 +202,7 @@ export default function KnowledgeBase() {
   // Auto-refresh news every minute
   useEffect(() => {
     const timer = setInterval(() => {
-      setNews(seededShuffle(mockNews, Math.floor(Date.now() / 60000)));
-      setLastRefresh(new Date().toLocaleTimeString('zh-CN'));
+      getNews().then(data => { setNews(data); setLastRefresh(new Date().toLocaleTimeString('zh-CN')); }).catch(() => {});
     }, 60000);
     return () => clearInterval(timer);
   }, []);
@@ -380,8 +370,7 @@ export default function KnowledgeBase() {
                     <ReloadOutlined
                       style={{ color: c.textDim, cursor: 'pointer', fontSize: 13 }}
                       onClick={() => {
-                        setNews(seededShuffle(mockNews, Date.now()));
-                        setLastRefresh(new Date().toLocaleTimeString('zh-CN'));
+                        getNews().then(data => { setNews(data); setLastRefresh(new Date().toLocaleTimeString('zh-CN')); }).catch(() => {});
                       }}
                     />
                   </Tooltip>

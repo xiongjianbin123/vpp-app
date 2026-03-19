@@ -4,7 +4,7 @@ import {
   LineChart, Line, AreaChart, Area, PieChart, Pie, Cell,
   XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
 } from 'recharts';
-import { generate24hData, mockDevices } from '../../mock/data';
+import { getDashboard } from '../../services/dashboardService';
 import {
   ArrowUpOutlined, ArrowDownOutlined, WarningOutlined, CheckCircleOutlined,
   RobotOutlined,
@@ -14,25 +14,14 @@ import { useTheme } from '../../context/ThemeContext';
 
 const COLORS = ['#38bdf8', '#00d4ff', '#ffb800', '#00ff88', '#a78bfa'];
 
-// 按实际装机容量动态计算能源结构
-const energyPie = [
-  { name: '电网侧储能', value: mockDevices.filter(d => d.type === '电网储能').reduce((s, d) => s + d.capacity, 0) },
-  { name: '工商业储能', value: mockDevices.filter(d => d.type === '储能系统').reduce((s, d) => s + d.capacity, 0) },
-  { name: '光伏', value: mockDevices.filter(d => d.type === '光伏电站').reduce((s, d) => s + d.capacity, 0) },
-  { name: '风电', value: mockDevices.filter(d => d.type === '风电').reduce((s, d) => s + d.capacity, 0) },
-  { name: '柔性负荷', value: mockDevices.filter(d => d.type === '充电桩' || d.type === '工业负荷').reduce((s, d) => s + d.capacity, 0) },
-];
-
-const totalCapacity = mockDevices.reduce((s, d) => s + d.capacity, 0);
-const totalCurrentPower = Math.round(mockDevices.filter(d => d.status === '在线').reduce((s, d) => s + d.currentPower, 0) * 10) / 10;
-const onlineCount = mockDevices.filter(d => d.status === '在线').length;
-
-const deviceStatus = [
-  { name: '在线', value: mockDevices.filter(d => d.status === '在线').length, color: '#00ff88' },
-  { name: '维护', value: mockDevices.filter(d => d.status === '维护').length, color: '#ffb800' },
-  { name: '告警', value: mockDevices.filter(d => d.status === '告警').length, color: '#ff4d4d' },
-  { name: '离线', value: mockDevices.filter(d => d.status === '离线').length, color: '#4a5568' },
-];
+const TYPE_LABEL_MAP: Record<string, string> = {
+  '电网储能': '电网侧储能',
+  '储能系统': '工商业储能',
+  '光伏电站': '光伏',
+  '风电': '风电',
+  '充电桩': '柔性负荷',
+  '工业负荷': '柔性负荷',
+};
 
 const alerts = [
   { id: 1, level: 'error', msg: '充电桩群-CBD 通信中断', time: '10:32', active: true },
@@ -67,11 +56,35 @@ function generateFreqData() {
 
 export default function Dashboard() {
   const { colors: c } = useTheme();
-  const [powerData] = useState(generate24hData());
+  const [powerData, setPowerData] = useState<Array<Record<string, string | number>>>([]);
   const [freqData, setFreqData] = useState(generateFreqData());
-  const [currentPower, setCurrentPower] = useState(totalCurrentPower);
+  const [currentPower, setCurrentPower] = useState(0);
+  const [totalCapacity, setTotalCapacity] = useState(0);
+  const [onlineCount, setOnlineCount] = useState(0);
+  const [energyPie, setEnergyPie] = useState<Array<{ name: string; value: number }>>([]);
+  const [deviceStatus, setDeviceStatus] = useState<Array<{ name: string; value: number; color: string }>>([]);
   const [lastUpdate, setLastUpdate] = useState(new Date());
   const [aiOpen, setAiOpen] = useState(false);
+
+  useEffect(() => {
+    getDashboard().then(data => {
+      setPowerData(data.powerData);
+      setCurrentPower(data.totalCurrentPower);
+      setTotalCapacity(data.totalCapacity);
+      setOnlineCount(data.onlineCount);
+      // 合并类型标签并去重求和
+      const pieMap: Record<string, number> = {};
+      Object.entries(data.energyPie).forEach(([type, value]) => {
+        const label = TYPE_LABEL_MAP[type] ?? type;
+        pieMap[label] = (pieMap[label] ?? 0) + (value as number);
+      });
+      setEnergyPie(Object.entries(pieMap).map(([name, value]) => ({ name, value: Math.round(value) })));
+      const statusColors: Record<string, string> = { '在线': '#00ff88', '维护': '#ffb800', '告警': '#ff4d4d', '离线': '#4a5568' };
+      setDeviceStatus(Object.entries(data.statusCount).map(([name, value]) => ({
+        name, value: value as number, color: statusColors[name] ?? '#888',
+      })));
+    });
+  }, []);
 
   useEffect(() => {
     const interval = setInterval(() => {

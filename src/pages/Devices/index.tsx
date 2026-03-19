@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   Table, Tag, Input, Select, Button, Drawer, Row, Col, Card,
   Progress, Modal, message, Tooltip, Tabs, Form, InputNumber, Alert,
@@ -10,7 +10,7 @@ import {
   EnvironmentOutlined, ToolOutlined,
   CheckCircleOutlined, WarningOutlined,
 } from '@ant-design/icons';
-import { mockDevices } from '../../mock/data';
+import * as deviceService from '../../services/deviceService';
 import type { Device } from '../../mock/data';
 import type { ColumnType } from 'antd/es/table';
 import { useTheme } from '../../context/ThemeContext';
@@ -343,8 +343,7 @@ function AddDeviceModal({ open, onClose, onAdd }: {
   const handleSubmit = () => {
     form.validateFields().then(values => {
       setLoading(true);
-      setTimeout(() => {
-        const isStorage = ['储能系统', '电网储能'].includes(values.type);
+      const isStorage = ['储能系统', '电网储能'].includes(values.type);
         const newDevice: Device = {
           id: `D${String(Date.now()).slice(-4)}`,
           name: values.name,
@@ -376,7 +375,6 @@ function AddDeviceModal({ open, onClose, onAdd }: {
         form.resetFields();
         setLoading(false);
         onClose();
-      }, 600);
     });
   };
 
@@ -501,13 +499,17 @@ function AddDeviceModal({ open, onClose, onAdd }: {
 // ─── 主页面 ──────────────────────────────────────────────────────────────────
 export default function Devices() {
   const { colors: c } = useTheme();
-  const [devices, setDevices] = useState<Device[]>(mockDevices);
+  const [devices, setDevices] = useState<Device[]>([]);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedDevice, setSelectedDevice] = useState<Device | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
+
+  useEffect(() => {
+    deviceService.getDevices().then(setDevices).catch(() => {});
+  }, []);
 
   const filtered = devices.filter(d => {
     const matchSearch = d.name.includes(search) || d.id.includes(search) || d.location.includes(search);
@@ -518,20 +520,10 @@ export default function Devices() {
 
   const handleRefresh = () => {
     setRefreshing(true);
-    setTimeout(() => {
-      setDevices(prev => prev.map(d => ({
-        ...d,
-        currentPower: d.status === '在线'
-          ? parseFloat((d.currentPower * (0.95 + Math.random() * 0.1)).toFixed(1))
-          : d.currentPower,
-        soc: d.soc !== undefined
-          ? Math.min(100, Math.max(0, d.soc + Math.round((Math.random() - 0.4) * 3)))
-          : undefined,
-        lastUpdate: new Date().toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' }),
-      })));
-      setRefreshing(false);
-      message.success('数据已刷新');
-    }, 800);
+    deviceService.getDevices()
+      .then(data => { setDevices(data); message.success('数据已刷新'); })
+      .catch(() => message.error('刷新失败'))
+      .finally(() => setRefreshing(false));
   };
 
   const handleToggle = (record: Device) => {
@@ -543,9 +535,9 @@ export default function Devices() {
       cancelText: '取消',
       okButtonProps: { style: { background: isOnline ? c.danger : c.primary, border: 'none', color: isOnline ? '#fff' : c.bgPage } },
       onOk: () => {
-        setDevices(prev => prev.map(d =>
-          d.id === record.id ? { ...d, status: isOnline ? '离线' : '在线', currentPower: isOnline ? 0 : d.capacity * 0.6 } : d
-        ));
+        const newStatus = isOnline ? '离线' : '在线';
+        deviceService.updateDevice(record.id, { ...record, status: newStatus, currentPower: isOnline ? 0 : record.capacity * 0.6 })
+          .then(updated => setDevices(prev => prev.map(d => d.id === updated.id ? updated : d)));
         message.success(`设备 ${record.name} 已${isOnline ? '停止' : '启动'}`);
       },
     });
@@ -559,10 +551,12 @@ export default function Devices() {
       cancelText: '取消',
       okButtonProps: { style: { background: c.warning, border: 'none', color: c.bgPage } },
       onOk: () => {
-        setDevices(prev => prev.map(d => d.id === record.id ? { ...d, status: '维护' } : d));
+        deviceService.updateDevice(record.id, { ...record, status: '维护' })
+          .then(updated => setDevices(prev => prev.map(d => d.id === updated.id ? updated : d)));
         message.info(`设备 ${record.name} 重启中...`);
         setTimeout(() => {
-          setDevices(prev => prev.map(d => d.id === record.id ? { ...d, status: '在线', currentPower: d.capacity * 0.65 } : d));
+          deviceService.updateDevice(record.id, { ...record, status: '在线', currentPower: record.capacity * 0.65 })
+            .then(updated => setDevices(prev => prev.map(d => d.id === updated.id ? updated : d)));
           message.success(`设备 ${record.name} 重启完成`);
         }, 3000);
       },
@@ -795,7 +789,7 @@ export default function Devices() {
       <AddDeviceModal
         open={addOpen}
         onClose={() => setAddOpen(false)}
-        onAdd={d => setDevices(prev => [...prev, d])}
+        onAdd={d => deviceService.createDevice(d).then(created => setDevices(prev => [...prev, created])).catch(() => {})}
       />
     </div>
   );
