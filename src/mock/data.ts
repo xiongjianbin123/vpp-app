@@ -323,6 +323,7 @@ export interface NewsItem {
   date: string;
   category: '现货市场' | '政策法规' | '储能动态' | '需求响应' | '价格行情';
   tags: string[];
+  url?: string;
 }
 
 export const mockNews: NewsItem[] = [

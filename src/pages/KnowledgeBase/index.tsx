@@ -8,12 +8,13 @@ import {
   DeleteOutlined, InboxOutlined, SendOutlined,
   ReloadOutlined, RobotOutlined, UserOutlined, KeyOutlined,
   CheckCircleOutlined, SyncOutlined, CloseCircleOutlined,
-  BookOutlined,
+  BookOutlined, WechatOutlined, SettingOutlined,
 } from '@ant-design/icons';
 import { streamAI, loadAIConfig, AI_PROVIDERS } from '../../services/aiService';
 import type { AIConfig } from '../../services/aiService';
 import AIModelSelector from '../../components/AIModelSelector';
 import { getNews } from '../../services/newsService';
+import { getWechatBiz, setWechatBiz } from '../../services/wechatNewsService';
 import type { NewsItem } from '../../mock/data';
 import { generateMockExcerpt, generateMockTags } from '../../mock/data';
 import { useTheme } from '../../context/ThemeContext';
@@ -178,9 +179,15 @@ export default function KnowledgeBase() {
   // News
   const [news, setNews] = useState<NewsItem[]>([]);
   const [lastRefresh, setLastRefresh] = useState(new Date().toLocaleTimeString('zh-CN'));
+  const [bizModalOpen, setBizModalOpen] = useState(false);
+  const [bizInput, setBizInput] = useState('');
+
+  const refreshNews = () => {
+    getNews().then(data => { setNews(data); setLastRefresh(new Date().toLocaleTimeString('zh-CN')); }).catch(() => {});
+  };
 
   useEffect(() => {
-    getNews().then(setNews).catch(() => {});
+    refreshNews();
   }, []);
   const [selectedNews, setSelectedNews] = useState<NewsItem | null>(null);
 
@@ -201,9 +208,7 @@ export default function KnowledgeBase() {
 
   // Auto-refresh news every minute
   useEffect(() => {
-    const timer = setInterval(() => {
-      getNews().then(data => { setNews(data); setLastRefresh(new Date().toLocaleTimeString('zh-CN')); }).catch(() => {});
-    }, 60000);
+    const timer = setInterval(refreshNews, 60000);
     return () => clearInterval(timer);
   }, []);
 
@@ -369,9 +374,13 @@ export default function KnowledgeBase() {
                   <Tooltip title="手动刷新">
                     <ReloadOutlined
                       style={{ color: c.textDim, cursor: 'pointer', fontSize: 13 }}
-                      onClick={() => {
-                        getNews().then(data => { setNews(data); setLastRefresh(new Date().toLocaleTimeString('zh-CN')); }).catch(() => {});
-                      }}
+                      onClick={refreshNews}
+                    />
+                  </Tooltip>
+                  <Tooltip title={getWechatBiz() ? `公众号已配置: ${getWechatBiz().slice(0, 8)}…` : '配置微信公众号 biz ID'}>
+                    <SettingOutlined
+                      style={{ color: getWechatBiz() ? '#07c160' : c.textDim, cursor: 'pointer', fontSize: 13 }}
+                      onClick={() => { setBizInput(getWechatBiz()); setBizModalOpen(true); }}
                     />
                   </Tooltip>
                 </div>
@@ -405,9 +414,24 @@ export default function KnowledgeBase() {
                         <span style={{ color: c.textDim, fontSize: 10 }}>{item.date}</span>
                       </div>
                       <div style={{ color: c.textPrimary, fontSize: 12, lineHeight: 1.5, marginBottom: 4 }}>
-                        {item.title}
+                        {item.url ? (
+                          <a
+                            href={item.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ color: c.textPrimary, textDecoration: 'none' }}
+                            onClick={e => e.stopPropagation()}
+                          >
+                            {item.title}
+                          </a>
+                        ) : item.title}
                       </div>
-                      <div style={{ color: c.textDim, fontSize: 11 }}>{item.source}</div>
+                      <div style={{ color: c.textDim, fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}>
+                        {item.source === '虚拟电厂公众号' && (
+                          <WechatOutlined style={{ color: '#07c160', fontSize: 12 }} />
+                        )}
+                        {item.source}
+                      </div>
                     </div>
                   </List.Item>
                 )}
@@ -665,7 +689,10 @@ export default function KnowledgeBase() {
       >
         {selectedNews && (
           <div>
-            <div style={{ color: c.textDim, fontSize: 12, marginBottom: 12 }}>
+            <div style={{ color: c.textDim, fontSize: 12, marginBottom: 12, display: 'flex', alignItems: 'center', gap: 4 }}>
+              {selectedNews.source === '虚拟电厂公众号' && (
+                <WechatOutlined style={{ color: '#07c160', fontSize: 12 }} />
+              )}
               {selectedNews.source} · {selectedNews.date}
             </div>
             <div style={{ color: c.textSecondary, fontSize: 13, lineHeight: 1.8 }}>
@@ -676,19 +703,63 @@ export default function KnowledgeBase() {
                 <Tag key={t} style={{ fontSize: 11, background: c.primaryMuted, border: `1px solid ${c.primaryBorderLight}`, color: c.textSecondary }}>{t}</Tag>
               ))}
             </div>
-            <Button
-              type="primary"
-              size="small"
-              style={{ marginTop: 16 }}
-              onClick={() => {
-                setSelectedNews(null);
-                sendMessage(`请详细介绍一下这条新闻：${selectedNews.title}`);
-              }}
-            >
-              向AI提问此新闻
-            </Button>
+            <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
+              <Button
+                type="primary"
+                size="small"
+                onClick={() => {
+                  setSelectedNews(null);
+                  sendMessage(`请详细介绍一下这条新闻：${selectedNews.title}`);
+                }}
+              >
+                向AI提问此新闻
+              </Button>
+              {selectedNews.url && (
+                <Button
+                  size="small"
+                  icon={<WechatOutlined style={{ color: '#07c160' }} />}
+                  href={selectedNews.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  查看原文
+                </Button>
+              )}
+            </div>
           </div>
         )}
+      </Modal>
+
+      {/* WeChat biz config modal */}
+      <Modal
+        open={bizModalOpen}
+        onCancel={() => setBizModalOpen(false)}
+        title={<span><WechatOutlined style={{ color: '#07c160', marginRight: 8 }} />配置微信公众号</span>}
+        styles={{ body: { background: c.bgSider }, header: { background: c.bgSider } }}
+        footer={[
+          <Button key="clear" danger size="small" onClick={() => { setWechatBiz(''); setBizInput(''); setBizModalOpen(false); refreshNews(); }}>
+            清除
+          </Button>,
+          <Button key="cancel" size="small" onClick={() => setBizModalOpen(false)}>取消</Button>,
+          <Button key="save" type="primary" size="small" onClick={() => { setWechatBiz(bizInput); setBizModalOpen(false); refreshNews(); message.success('biz ID 已保存，正在刷新资讯…'); }}>
+            保存并刷新
+          </Button>,
+        ]}
+        width={480}
+      >
+        <div style={{ color: c.textSecondary, fontSize: 13, lineHeight: 1.8, marginBottom: 16 }}>
+          填入"虚拟电厂"公众号的 <code>__biz</code> 参数，系统将通过 RSSHub 自动拉取当日最新 2 条文章。
+          <br />
+          <span style={{ color: c.textDim, fontSize: 12 }}>
+            获取方式：在电脑微信中打开该公众号任意文章 → 右键"用浏览器打开" → 复制 URL 中 <code>__biz=</code> 之后 <code>&amp;</code> 之前的值。
+          </span>
+        </div>
+        <Input
+          value={bizInput}
+          onChange={e => setBizInput(e.target.value)}
+          placeholder="例如: MzU3NjcwNDk2OQ=="
+          style={{ background: c.bgSider, border: `1px solid ${c.primaryBorder}`, color: c.textPrimary }}
+        />
       </Modal>
 
       <AIModelSelector
