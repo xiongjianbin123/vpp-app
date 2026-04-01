@@ -77,6 +77,41 @@ interface InvestmentConfig {
   // 容量费管理
   capacityFeeRate: number;         // 需量电费单价(元/kW/月)
   capacityFeeMonths: number;       // 年节省月数
+
+  // 广东现货市场结算参数
+  gdEnabled: boolean;              // 是否启用广东现货结算模型
+  gdAnnualDays: number;            // 年运行天数
+  gdAuxPowerRate: number;          // 厂用电率(%)
+  gdSettlementMode: '15min' | 'hourly'; // 结算模式
+  gdTransmissionFee: number;       // 输配电价(元/kWh)
+  gdGovernmentFund: number;        // 政府性基金及附加(元/kWh)
+  gdLineLossFee: number;           // 上网环节线损费用(元/kWh)
+  gdLineLossExempt: boolean;       // 线损费用是否豁免(待确认)
+  // 典型日交易时段（4段：2充2放）
+  gdSlot1Type: 'charge' | 'discharge';
+  gdSlot1Qty: number;              // 出清电量(MWh)，充电为正
+  gdSlot1DayAheadPrice: number;    // 日前电价(元/MWh)
+  gdSlot1RealQty: number;          // 实际电量(MWh)
+  gdSlot1RealPrice: number;        // 实时电价(元/MWh)
+  gdSlot2Type: 'charge' | 'discharge';
+  gdSlot2Qty: number;
+  gdSlot2DayAheadPrice: number;
+  gdSlot2RealQty: number;
+  gdSlot2RealPrice: number;
+  gdSlot3Type: 'charge' | 'discharge';
+  gdSlot3Qty: number;
+  gdSlot3DayAheadPrice: number;
+  gdSlot3RealQty: number;
+  gdSlot3RealPrice: number;
+  gdSlot4Type: 'charge' | 'discharge';
+  gdSlot4Qty: number;
+  gdSlot4DayAheadPrice: number;
+  gdSlot4RealQty: number;
+  gdSlot4RealPrice: number;
+  // 辅助服务与容量补偿（年度额外收益，万元）
+  gdAuxServiceRevenue: number;     // 辅助服务市场收益
+  gdCapacityCompensation: number;  // 容量补偿收益
+  gdReturnShareFee: number;        // 返还及分摊电费收益
 }
 
 interface YearlyRow {
@@ -130,7 +165,139 @@ const GRID_MODELS = [
   { value: 'frequency', label: '调频辅助服务', desc: '参与 AGC 调频获取里程收益' },
   { value: 'capacityLease', label: '容量租赁', desc: '向电网出租储能容量' },
   { value: 'spotArbitrage', label: '现货市场套利', desc: '参与电力现货市场低买高卖' },
+  { value: 'guangdongSpot', label: '广东现货结算', desc: '按广东电力现货市场结算细则（2026年版）双单元结算' },
 ];
+
+// ─── 广东现货结算计算 ─────────────────────────────────────────────────────────
+
+interface GdSlotResult {
+  type: 'charge' | 'discharge';
+  dayAheadQty: number;
+  dayAheadPrice: number;
+  realQty: number;
+  realPrice: number;
+  dayAheadFee: number;        // 日前结算电费
+  deviationQty: number;       // 偏差电量
+  deviationFee: number;       // 偏差结算电费
+  totalFee: number;           // 该时段总电费（正=收入，负=支出）
+}
+
+interface GdSettlementResult {
+  slots: GdSlotResult[];
+  dischargeDayAhead: number;   // 放电日前收入
+  chargeDayAhead: number;      // 充电日前支出
+  dischargeDeviation: number;  // 放电偏差结算
+  chargeDeviation: number;     // 充电偏差结算
+  dailyEnergyRevenue: number;  // 日电能量净收益
+  dailyTransmissionSaving: number;  // 日输配电费豁免节省
+  dailyGovFundSaving: number;  // 日政府性基金豁免节省
+  dailyLineLossCost: number;   // 日线损费用（如需承担）
+  dailyTotalRevenue: number;   // 日总收益（含豁免节省）
+  annualEnergyRevenue: number; // 年电能量收益（万元）
+  annualTransmissionSaving: number;
+  annualGovFundSaving: number;
+  annualLineLossCost: number;
+  annualAuxService: number;    // 年辅助服务收益
+  annualCapacityComp: number;  // 年容量补偿
+  annualReturnShare: number;   // 年返还分摊
+  annualTotalRevenue: number;  // 年度总收益（万元）
+  totalInvestment: number;     // 总投资（万元）
+  energyROI: number;           // 电能量收益投资回报率(%)
+  totalROI: number;            // 综合收益投资回报率(%)
+}
+
+function computeGdSettlement(cfg: InvestmentConfig): GdSettlementResult {
+  const slots: GdSlotResult[] = [];
+  const slotConfigs = [
+    { type: cfg.gdSlot1Type, qty: cfg.gdSlot1Qty, daPrice: cfg.gdSlot1DayAheadPrice, rQty: cfg.gdSlot1RealQty, rPrice: cfg.gdSlot1RealPrice },
+    { type: cfg.gdSlot2Type, qty: cfg.gdSlot2Qty, daPrice: cfg.gdSlot2DayAheadPrice, rQty: cfg.gdSlot2RealQty, rPrice: cfg.gdSlot2RealPrice },
+    { type: cfg.gdSlot3Type, qty: cfg.gdSlot3Qty, daPrice: cfg.gdSlot3DayAheadPrice, rQty: cfg.gdSlot3RealQty, rPrice: cfg.gdSlot3RealPrice },
+    { type: cfg.gdSlot4Type, qty: cfg.gdSlot4Qty, daPrice: cfg.gdSlot4DayAheadPrice, rQty: cfg.gdSlot4RealQty, rPrice: cfg.gdSlot4RealPrice },
+  ];
+
+  for (const sc of slotConfigs) {
+    // 日前结算：出清电量 × 日前电价
+    // 放电为正收入，充电为负支出
+    const sign = sc.type === 'discharge' ? 1 : -1;
+    const dayAheadFee = sign * sc.qty * sc.daPrice;
+    // 偏差 = 实际 - 日前出清
+    const deviationQty = sc.rQty - sc.qty;
+    // 偏差电费 = 偏差电量 × 实时电价
+    const deviationFee = sign * deviationQty * sc.rPrice;
+    const totalFee = dayAheadFee + deviationFee;
+
+    slots.push({
+      type: sc.type,
+      dayAheadQty: sc.qty,
+      dayAheadPrice: sc.daPrice,
+      realQty: sc.rQty,
+      realPrice: sc.rPrice,
+      dayAheadFee,
+      deviationQty,
+      deviationFee,
+      totalFee,
+    });
+  }
+
+  const dischargeDayAhead = slots.filter(s => s.type === 'discharge').reduce((sum, s) => sum + s.dayAheadFee, 0);
+  const chargeDayAhead = slots.filter(s => s.type === 'charge').reduce((sum, s) => sum + s.dayAheadFee, 0);
+  const dischargeDeviation = slots.filter(s => s.type === 'discharge').reduce((sum, s) => sum + s.deviationFee, 0);
+  const chargeDeviation = slots.filter(s => s.type === 'charge').reduce((sum, s) => sum + s.deviationFee, 0);
+
+  const dailyEnergyRevenue = slots.reduce((sum, s) => sum + s.totalFee, 0);
+
+  // 充电电量（用于费用豁免计算）
+  const totalChargeQty = slots.filter(s => s.type === 'charge').reduce((sum, s) => sum + s.realQty, 0);
+
+  // 输配电费豁免节省 = 充电电量 × 输配电价
+  const dailyTransmissionSaving = totalChargeQty * cfg.gdTransmissionFee;
+  // 政府性基金豁免节省 = 充电电量 × 政府性基金
+  const dailyGovFundSaving = totalChargeQty * cfg.gdGovernmentFund;
+  // 线损费用（如不豁免则需承担）
+  const dailyLineLossCost = cfg.gdLineLossExempt ? 0 : totalChargeQty * cfg.gdLineLossFee;
+
+  const dailyTotalRevenue = dailyEnergyRevenue + dailyTransmissionSaving + dailyGovFundSaving - dailyLineLossCost;
+
+  const days = cfg.gdAnnualDays;
+  const annualEnergyRevenue = +(dailyEnergyRevenue * days / 10000).toFixed(2);
+  const annualTransmissionSaving = +(dailyTransmissionSaving * days / 10000).toFixed(2);
+  const annualGovFundSaving = +(dailyGovFundSaving * days / 10000).toFixed(2);
+  const annualLineLossCost = +(dailyLineLossCost * days / 10000).toFixed(2);
+
+  const annualTotalRevenue = +(
+    annualEnergyRevenue + annualTransmissionSaving + annualGovFundSaving
+    - annualLineLossCost
+    + cfg.gdAuxServiceRevenue + cfg.gdCapacityCompensation + cfg.gdReturnShareFee
+  ).toFixed(2);
+
+  const totalInvestment = computeTotalInvestment(cfg);
+  const energyROI = totalInvestment > 0 ? +(annualEnergyRevenue / totalInvestment * 100).toFixed(2) : 0;
+  const totalROI = totalInvestment > 0 ? +(annualTotalRevenue / totalInvestment * 100).toFixed(2) : 0;
+
+  return {
+    slots,
+    dischargeDayAhead,
+    chargeDayAhead,
+    dischargeDeviation,
+    chargeDeviation,
+    dailyEnergyRevenue,
+    dailyTransmissionSaving,
+    dailyGovFundSaving,
+    dailyLineLossCost,
+    dailyTotalRevenue,
+    annualEnergyRevenue,
+    annualTransmissionSaving,
+    annualGovFundSaving,
+    annualLineLossCost,
+    annualAuxService: cfg.gdAuxServiceRevenue,
+    annualCapacityComp: cfg.gdCapacityCompensation,
+    annualReturnShare: cfg.gdReturnShareFee,
+    annualTotalRevenue,
+    totalInvestment,
+    energyROI,
+    totalROI,
+  };
+}
 
 // ─── 核心计算函数 ──────────────────────────────────────────────────────────────
 
@@ -174,6 +341,10 @@ function computeAnnualRevenue(cfg: InvestmentConfig, year: number): number {
   if (models.includes('capacityFee')) {
     // 年收益 = 功率(MW)×1000kW × 需量单价(元/kW/月) × 月数 ÷ 10000
     rev += cfg.ratedPower * 1000 * cfg.capacityFeeRate * cfg.capacityFeeMonths / 10000;
+  }
+  if (models.includes('guangdongSpot') && cfg.gdEnabled) {
+    const gd = computeGdSettlement(cfg);
+    rev += gd.annualTotalRevenue * deg;
   }
 
   return +rev.toFixed(4);
@@ -360,6 +531,44 @@ const DEFAULT_CONFIG: InvestmentConfig = {
   demandResponsePrice: 0.3,
   capacityFeeRate: 40,
   capacityFeeMonths: 12,
+
+  // 广东现货市场结算默认值（基于政策案例）
+  gdEnabled: false,
+  gdAnnualDays: 330,
+  gdAuxPowerRate: 2,
+  gdSettlementMode: '15min',
+  gdTransmissionFee: 0.15,
+  gdGovernmentFund: 0.05,
+  gdLineLossFee: 0.03,
+  gdLineLossExempt: false,
+  // 时段1：谷时充电
+  gdSlot1Type: 'charge',
+  gdSlot1Qty: 100,
+  gdSlot1DayAheadPrice: 200,
+  gdSlot1RealQty: 95,
+  gdSlot1RealPrice: 180,
+  // 时段2：高峰放电
+  gdSlot2Type: 'discharge',
+  gdSlot2Qty: 80,
+  gdSlot2DayAheadPrice: 450,
+  gdSlot2RealQty: 75,
+  gdSlot2RealPrice: 480,
+  // 时段3：平时充电
+  gdSlot3Type: 'charge',
+  gdSlot3Qty: 90,
+  gdSlot3DayAheadPrice: 280,
+  gdSlot3RealQty: 85,
+  gdSlot3RealPrice: 300,
+  // 时段4：晚高峰放电
+  gdSlot4Type: 'discharge',
+  gdSlot4Qty: 95,
+  gdSlot4DayAheadPrice: 600,
+  gdSlot4RealQty: 90,
+  gdSlot4RealPrice: 550,
+  // 额外收益
+  gdAuxServiceRevenue: 300,
+  gdCapacityCompensation: 200,
+  gdReturnShareFee: 100,
 };
 
 // ─── 主组件 ───────────────────────────────────────────────────────────────────
@@ -796,7 +1005,7 @@ export default function InvestmentCalculator() {
       peakValley: '#00d4ff', spotArbitrage: '#38bdf8',
       frequency: '#00ff88', peakReg: '#a78bfa',
       capacityLease: '#ffb800', demandResponse: '#fb923c',
-      capacityFee: '#f472b6',
+      capacityFee: '#f472b6', guangdongSpot: '#e879f9',
     };
 
     // 逐年分模式收益拆解
@@ -819,6 +1028,10 @@ export default function InvestmentCalculator() {
         row.demandResponse = +(cfg.ratedPower * 1000 * cfg.demandResponseDuration * cfg.demandResponseEvents * cfg.demandResponsePrice / 10000 * deg).toFixed(2);
       if (cfg.selectedModels.includes('capacityFee'))
         row.capacityFee = +(cfg.ratedPower * 1000 * cfg.capacityFeeRate * cfg.capacityFeeMonths / 10000).toFixed(2);
+      if (cfg.selectedModels.includes('guangdongSpot') && cfg.gdEnabled) {
+        const gd = computeGdSettlement(cfg);
+        row.guangdongSpot = +(gd.annualTotalRevenue * deg).toFixed(2);
+      }
       return row;
     });
 
@@ -1194,6 +1407,337 @@ export default function InvestmentCalculator() {
     );
   };
 
+  // ─── 广东现货结算结果 ──────────────────────────────────────────────────
+  const gdResult = useMemo(() => computeGdSettlement(cfg), [cfg]);
+
+  const Tab10 = () => {
+    const slotLabels = ['谷时充电', '高峰放电', '平时充电', '晚高峰放电'];
+    const slotKeys = [1, 2, 3, 4] as const;
+
+    type SlotField = 'Type' | 'Qty' | 'DayAheadPrice' | 'RealQty' | 'RealPrice';
+    const getSlotKey = (idx: number, field: SlotField): keyof InvestmentConfig =>
+      `gdSlot${idx}${field}` as keyof InvestmentConfig;
+
+    // 年度收益构成饼图
+    const gdPieData = [
+      { name: '电能量收益', value: Math.max(0, gdResult.annualEnergyRevenue), color: '#00d4ff' },
+      { name: '输配电费节省', value: gdResult.annualTransmissionSaving, color: '#00ff88' },
+      { name: '政府基金节省', value: gdResult.annualGovFundSaving, color: '#38bdf8' },
+      { name: '辅助服务', value: gdResult.annualAuxService, color: '#a78bfa' },
+      { name: '容量补偿', value: gdResult.annualCapacityComp, color: '#ffb800' },
+      { name: '返还分摊', value: gdResult.annualReturnShare, color: '#fb923c' },
+    ].filter(d => d.value > 0);
+
+    // 各时段收益柱状图数据
+    const slotChartData = gdResult.slots.map((s, i) => ({
+      name: slotLabels[i],
+      dayAheadFee: +(s.dayAheadFee / 1000).toFixed(2),
+      deviationFee: +(s.deviationFee / 1000).toFixed(2),
+      total: +(s.totalFee / 1000).toFixed(2),
+    }));
+
+    return (
+      <Row gutter={[16, 16]}>
+        {/* 政策依据卡片 */}
+        <Col span={24}>
+          <Card style={cardStyle} styles={{ header: headStyle }}
+            title={<span style={{ color: c.primary }}>广东独立储能现货市场结算模型 <Tag color="blue">2026年版</Tag></span>}>
+            <div style={{ color: c.textSecondary, fontSize: 13, lineHeight: 2 }}>
+              <div>依据 <Tag color="geekblue">《广东电力现货市场结算实施细则（2026年修订）》</Tag> 第7.3节 储能主体结算规则</div>
+              <div>结算架构：<Tag color="cyan">放电（发电）结算单元</Tag> + <Tag color="orange">充电（抽水）结算单元</Tag> 双单元独立结算</div>
+              <div style={{ marginTop: 4, color: c.textDim, fontSize: 12 }}>
+                核心优惠：充电电量不承担输配电价和政府性基金及附加 · 不执行中长期交易偏差考核 · 返还及分摊电费全部计入放电单元
+              </div>
+            </div>
+          </Card>
+        </Col>
+
+        {/* 基础参数配置 */}
+        <Col span={8}>
+          <Card style={cardStyle} styles={{ header: headStyle }} title={<span style={{ color: c.primary }}>基础参数</span>}>
+            <Form layout="vertical" style={{ marginTop: 8 }}>
+              <Form.Item label={<span style={labelStyle}>启用广东现货结算模型</span>}>
+                <Radio.Group value={cfg.gdEnabled} onChange={e => set('gdEnabled', e.target.value)}>
+                  <Radio.Button value={true}>启用</Radio.Button>
+                  <Radio.Button value={false}>未启用</Radio.Button>
+                </Radio.Group>
+              </Form.Item>
+              <Form.Item label={<span style={labelStyle}>年运行天数</span>}>
+                <InputNumber value={cfg.gdAnnualDays} onChange={v => set('gdAnnualDays', v ?? 330)} min={200} max={365} style={{ ...inputStyle, width: '100%' }} />
+              </Form.Item>
+              <Form.Item label={<span style={labelStyle}>厂用电率（%）</span>}>
+                <InputNumber value={cfg.gdAuxPowerRate} onChange={v => set('gdAuxPowerRate', v ?? 2)} min={0} max={10} step={0.5} style={{ ...inputStyle, width: '100%' }} />
+              </Form.Item>
+              <Form.Item label={<span style={labelStyle}>结算模式</span>}>
+                <Select value={cfg.gdSettlementMode} onChange={v => set('gdSettlementMode', v)} style={{ width: '100%' }}
+                  options={[
+                    { value: '15min', label: '15分钟结算（推荐）' },
+                    { value: 'hourly', label: '小时结算' },
+                  ]} />
+              </Form.Item>
+            </Form>
+          </Card>
+        </Col>
+
+        {/* 费用豁免参数 */}
+        <Col span={8}>
+          <Card style={cardStyle} styles={{ header: headStyle }} title={<span style={{ color: c.primary }}>费用豁免参数</span>}>
+            <Form layout="vertical" style={{ marginTop: 8 }}>
+              <Form.Item label={
+                <span style={labelStyle}>
+                  输配电价（元/kWh）
+                  <Tooltip title="充电电量不承担，节省此费用"><InfoCircleOutlined style={{ color: c.textDim, marginLeft: 4 }} /></Tooltip>
+                </span>
+              }>
+                <InputNumber value={cfg.gdTransmissionFee} onChange={v => set('gdTransmissionFee', v ?? 0.15)} min={0} step={0.01} style={{ ...inputStyle, width: '100%' }} />
+              </Form.Item>
+              <Form.Item label={
+                <span style={labelStyle}>
+                  政府性基金及附加（元/kWh）
+                  <Tooltip title="充电电量不承担，节省此费用"><InfoCircleOutlined style={{ color: c.textDim, marginLeft: 4 }} /></Tooltip>
+                </span>
+              }>
+                <InputNumber value={cfg.gdGovernmentFund} onChange={v => set('gdGovernmentFund', v ?? 0.05)} min={0} step={0.01} style={{ ...inputStyle, width: '100%' }} />
+              </Form.Item>
+              <Form.Item label={<span style={labelStyle}>上网环节线损费用（元/kWh）</span>}>
+                <InputNumber value={cfg.gdLineLossFee} onChange={v => set('gdLineLossFee', v ?? 0.03)} min={0} step={0.01} style={{ ...inputStyle, width: '100%' }} />
+              </Form.Item>
+              <Form.Item label={
+                <span style={labelStyle}>
+                  线损费用是否豁免
+                  <Tooltip title="规则未明确，建议向交易中心确认。河北已明确需承担，山东长时储能试点已豁免"><InfoCircleOutlined style={{ color: '#ffb800', marginLeft: 4 }} /></Tooltip>
+                </span>
+              }>
+                <Radio.Group value={cfg.gdLineLossExempt} onChange={e => set('gdLineLossExempt', e.target.value)}>
+                  <Radio.Button value={true}>豁免</Radio.Button>
+                  <Radio.Button value={false}>需承担</Radio.Button>
+                </Radio.Group>
+              </Form.Item>
+            </Form>
+          </Card>
+        </Col>
+
+        {/* 额外收益参数 */}
+        <Col span={8}>
+          <Card style={cardStyle} styles={{ header: headStyle }} title={<span style={{ color: c.primary }}>额外收益（年度，万元）</span>}>
+            <Form layout="vertical" style={{ marginTop: 8 }}>
+              {[
+                { label: '辅助服务市场收益（调频等）', key: 'gdAuxServiceRevenue' as const },
+                { label: '容量补偿收益', key: 'gdCapacityCompensation' as const },
+                { label: '返还及分摊电费收益', key: 'gdReturnShareFee' as const },
+              ].map(({ label, key }) => (
+                <Form.Item key={key} label={<span style={labelStyle}>{label}</span>}>
+                  <InputNumber value={cfg[key] as number} onChange={v => set(key, v ?? 0)} min={0} step={10} style={{ ...inputStyle, width: '100%' }} addonAfter="万元" />
+                </Form.Item>
+              ))}
+              <div style={{ color: c.textDim, fontSize: 12, marginTop: 8, padding: '8px 12px', background: c.bgPage, borderRadius: 6 }}>
+                以上为电能量市场之外的收益来源，可参考当地辅助服务市场实际情况填写
+              </div>
+            </Form>
+          </Card>
+        </Col>
+
+        {/* 典型日交易场景 */}
+        <Col span={24}>
+          <Card style={cardStyle} styles={{ header: headStyle }}
+            title={<span style={{ color: c.primary }}>典型日交易场景配置（日前出清 vs 实际执行）</span>}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead>
+                <tr style={{ borderBottom: `2px solid ${c.primaryBorderLight}` }}>
+                  <th style={{ padding: '10px 12px', textAlign: 'left', color: c.textMuted }}>时段</th>
+                  <th style={{ padding: '10px 12px', textAlign: 'center', color: c.textMuted }}>充放电</th>
+                  <th style={{ padding: '10px 12px', textAlign: 'center', color: '#38bdf8' }}>日前出清电量(MWh)</th>
+                  <th style={{ padding: '10px 12px', textAlign: 'center', color: '#38bdf8' }}>日前电价(元/MWh)</th>
+                  <th style={{ padding: '10px 12px', textAlign: 'center', color: '#a78bfa' }}>实际电量(MWh)</th>
+                  <th style={{ padding: '10px 12px', textAlign: 'center', color: '#a78bfa' }}>实时电价(元/MWh)</th>
+                  <th style={{ padding: '10px 12px', textAlign: 'center', color: c.textMuted }}>偏差(MWh)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {slotKeys.map((idx) => (
+                  <tr key={idx} style={{ borderBottom: `1px solid ${c.borderSubtle}` }}>
+                    <td style={{ padding: '8px 12px', color: c.textPrimary, fontWeight: 600 }}>{slotLabels[idx - 1]}</td>
+                    <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                      <Select
+                        value={cfg[getSlotKey(idx, 'Type')] as string}
+                        onChange={v => set(getSlotKey(idx, 'Type'), v as 'charge' | 'discharge')}
+                        style={{ width: 90 }}
+                        size="small"
+                        options={[
+                          { value: 'charge', label: '充电' },
+                          { value: 'discharge', label: '放电' },
+                        ]}
+                      />
+                    </td>
+                    <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                      <InputNumber value={cfg[getSlotKey(idx, 'Qty')] as number} onChange={v => set(getSlotKey(idx, 'Qty'), v ?? 0)} min={0} step={5} size="small" style={{ ...inputStyle, width: 100 }} />
+                    </td>
+                    <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                      <InputNumber value={cfg[getSlotKey(idx, 'DayAheadPrice')] as number} onChange={v => set(getSlotKey(idx, 'DayAheadPrice'), v ?? 0)} min={0} step={10} size="small" style={{ ...inputStyle, width: 100 }} />
+                    </td>
+                    <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                      <InputNumber value={cfg[getSlotKey(idx, 'RealQty')] as number} onChange={v => set(getSlotKey(idx, 'RealQty'), v ?? 0)} min={0} step={5} size="small" style={{ ...inputStyle, width: 100 }} />
+                    </td>
+                    <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                      <InputNumber value={cfg[getSlotKey(idx, 'RealPrice')] as number} onChange={v => set(getSlotKey(idx, 'RealPrice'), v ?? 0)} min={0} step={10} size="small" style={{ ...inputStyle, width: 100 }} />
+                    </td>
+                    <td style={{ padding: '8px 12px', textAlign: 'center' }}>
+                      <span style={{
+                        color: gdResult.slots[idx - 1]?.deviationQty === 0 ? c.textDim
+                          : gdResult.slots[idx - 1]?.deviationQty > 0 ? '#00ff88' : '#ff4d4d',
+                        fontWeight: 600,
+                      }}>
+                        {gdResult.slots[idx - 1]?.deviationQty > 0 ? '+' : ''}{gdResult.slots[idx - 1]?.deviationQty}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Card>
+        </Col>
+
+        {/* 结算明细 */}
+        <Col span={14}>
+          <Card style={cardStyle} styles={{ header: headStyle }}
+            title={<span style={{ color: c.primary }}>双结算单元日结算明细（元）</span>}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead>
+                <tr style={{ borderBottom: `2px solid ${c.primaryBorderLight}` }}>
+                  <th style={{ padding: '8px 12px', textAlign: 'left', color: c.textMuted }}>结算项</th>
+                  <th style={{ padding: '8px 12px', textAlign: 'right', color: '#00ff88' }}>放电单元</th>
+                  <th style={{ padding: '8px 12px', textAlign: 'right', color: '#ffb800' }}>充电单元</th>
+                  <th style={{ padding: '8px 12px', textAlign: 'right', color: c.textPrimary }}>合计</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  { label: '日前电能量电费', discharge: gdResult.dischargeDayAhead, charge: gdResult.chargeDayAhead },
+                  { label: '实时偏差电费', discharge: gdResult.dischargeDeviation, charge: gdResult.chargeDeviation },
+                  { label: '输配电费豁免节省', discharge: 0, charge: gdResult.dailyTransmissionSaving },
+                  { label: '政府基金豁免节省', discharge: 0, charge: gdResult.dailyGovFundSaving },
+                  ...(!cfg.gdLineLossExempt ? [{ label: '线损费用（支出）', discharge: 0, charge: -gdResult.dailyLineLossCost }] : []),
+                ].map((row, i) => (
+                  <tr key={i} style={{ borderBottom: `1px solid ${c.borderSubtle}` }}>
+                    <td style={{ padding: '8px 12px', color: c.textSecondary }}>{row.label}</td>
+                    <td style={{ padding: '8px 12px', textAlign: 'right', color: row.discharge > 0 ? '#00ff88' : row.discharge < 0 ? '#ff4d4d' : c.textDim }}>
+                      {row.discharge !== 0 ? `${row.discharge > 0 ? '+' : ''}${row.discharge.toLocaleString('zh-CN', { maximumFractionDigits: 0 })}` : '-'}
+                    </td>
+                    <td style={{ padding: '8px 12px', textAlign: 'right', color: row.charge > 0 ? '#00ff88' : row.charge < 0 ? '#ff4d4d' : c.textDim }}>
+                      {row.charge !== 0 ? `${row.charge > 0 ? '+' : ''}${row.charge.toLocaleString('zh-CN', { maximumFractionDigits: 0 })}` : '-'}
+                    </td>
+                    <td style={{ padding: '8px 12px', textAlign: 'right', fontWeight: 600, color: (row.discharge + row.charge) >= 0 ? '#00d4ff' : '#ff4d4d' }}>
+                      {(row.discharge + row.charge) > 0 ? '+' : ''}{(row.discharge + row.charge).toLocaleString('zh-CN', { maximumFractionDigits: 0 })}
+                    </td>
+                  </tr>
+                ))}
+                <tr style={{ borderTop: `2px solid ${c.primary}`, background: 'rgba(0,212,255,0.04)' }}>
+                  <td style={{ padding: '10px 12px', color: c.primary, fontWeight: 700 }}>日总净收益</td>
+                  <td colSpan={2}></td>
+                  <td style={{ padding: '10px 12px', textAlign: 'right', color: gdResult.dailyTotalRevenue >= 0 ? '#00ff88' : '#ff4d4d', fontWeight: 700, fontSize: 15 }}>
+                    {gdResult.dailyTotalRevenue > 0 ? '+' : ''}{gdResult.dailyTotalRevenue.toLocaleString('zh-CN', { maximumFractionDigits: 0 })} 元
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </Card>
+        </Col>
+
+        {/* 各时段收益图 */}
+        <Col span={10}>
+          <Card style={cardStyle} styles={{ header: headStyle }} title={<span style={{ color: c.primary }}>各时段结算（千元）</span>}>
+            <ResponsiveContainer width="100%" height={260}>
+              <BarChart data={slotChartData} margin={{ top: 10, right: 16, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" stroke={c.borderSubtle} />
+                <XAxis dataKey="name" stroke={c.textDim} tick={{ fontSize: 11 }} />
+                <YAxis stroke={c.textDim} tick={{ fontSize: 11 }} unit="千" />
+                <RTooltip contentStyle={tooltipStyle} formatter={(v: unknown) => [`${Number(v).toFixed(2)} 千元`, '']} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Bar dataKey="dayAheadFee" name="日前结算" fill="#38bdf8" />
+                <Bar dataKey="deviationFee" name="偏差结算" fill="#a78bfa" />
+              </BarChart>
+            </ResponsiveContainer>
+          </Card>
+        </Col>
+
+        {/* 年度收益汇总 KPI */}
+        <Col span={24}>
+          <Row gutter={[12, 12]}>
+            {[
+              { label: '年电能量收益', value: `¥${gdResult.annualEnergyRevenue}万`, color: '#00d4ff' },
+              { label: '年输配电费节省', value: `¥${gdResult.annualTransmissionSaving}万`, color: '#00ff88' },
+              { label: '年政府基金节省', value: `¥${gdResult.annualGovFundSaving}万`, color: '#38bdf8' },
+              { label: '年线损费用', value: cfg.gdLineLossExempt ? '豁免' : `-¥${gdResult.annualLineLossCost}万`, color: cfg.gdLineLossExempt ? '#00ff88' : '#ffb800' },
+              { label: '年综合总收益', value: `¥${gdResult.annualTotalRevenue}万`, color: '#00ff88' },
+              { label: '综合投资回报率', value: `${gdResult.totalROI}%`, color: gdResult.totalROI >= 8 ? '#00ff88' : gdResult.totalROI >= 5 ? '#ffb800' : '#ff4d4d' },
+            ].map(item => (
+              <Col key={item.label} span={4}>
+                <Card style={cardStyle} styles={{ body: { padding: '14px 16px' } }}>
+                  <div style={{ color: c.textDim, fontSize: 11, marginBottom: 4 }}>{item.label}</div>
+                  <div style={{ color: item.color, fontSize: 18, fontWeight: 700, fontFamily: 'monospace' }}>{item.value}</div>
+                </Card>
+              </Col>
+            ))}
+          </Row>
+        </Col>
+
+        {/* 年度收益构成饼图 */}
+        <Col span={10}>
+          <Card style={cardStyle} styles={{ header: headStyle }} title={<span style={{ color: c.primary }}>年度收益构成</span>}>
+            <ResponsiveContainer width="100%" height={250}>
+              <PieChart>
+                <Pie data={gdPieData} cx="50%" cy="50%" innerRadius={50} outerRadius={85} dataKey="value"
+                  label={({ name, percent }: { name?: string; percent?: number }) => `${name ?? ''} ${((percent ?? 0) * 100).toFixed(0)}%`}
+                  labelLine={{ stroke: '#4a6080' }}>
+                  {gdPieData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+                </Pie>
+                <RTooltip contentStyle={tooltipStyle} formatter={(v: unknown) => [`¥${Number(v).toFixed(2)}万`, '']} />
+              </PieChart>
+            </ResponsiveContainer>
+          </Card>
+        </Col>
+
+        {/* 投资回报分析 + 政策要点 */}
+        <Col span={14}>
+          <Card style={cardStyle} styles={{ header: headStyle }} title={<span style={{ color: c.primary }}>投资回报分析</span>}>
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <tbody>
+                {[
+                  { label: '装机容量', value: `${cfg.ratedPower} MW / ${cfg.ratedCapacity} MWh` },
+                  { label: '总投资', value: `¥${gdResult.totalInvestment} 万元（${(cfg.ratedCapacity > 0 ? gdResult.totalInvestment * 10000 / (cfg.ratedCapacity * 1000) : 0).toFixed(2)} 元/Wh）` },
+                  { label: '年电能量收益', value: `¥${gdResult.annualEnergyRevenue} 万元`, highlight: true },
+                  { label: '年费用豁免节省', value: `¥${(gdResult.annualTransmissionSaving + gdResult.annualGovFundSaving).toFixed(2)} 万元`, highlight: true },
+                  { label: '年辅助服务+容量+返还', value: `¥${(gdResult.annualAuxService + gdResult.annualCapacityComp + gdResult.annualReturnShare).toFixed(2)} 万元` },
+                  { label: '年综合总收益', value: `¥${gdResult.annualTotalRevenue} 万元`, highlight: true },
+                  { label: '电能量收益投资回报率', value: `${gdResult.energyROI}%` },
+                  { label: '综合收益投资回报率', value: `${gdResult.totalROI}%`, highlight: true },
+                  { label: '简单回收期（综合）', value: gdResult.annualTotalRevenue > 0 ? `${(gdResult.totalInvestment / gdResult.annualTotalRevenue).toFixed(1)} 年` : '无法回收' },
+                ].map((row, i) => (
+                  <tr key={i} style={{ background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)' }}>
+                    <td style={{ padding: '7px 12px', color: c.textMuted, borderBottom: `1px solid ${c.borderSubtle}` }}>{row.label}</td>
+                    <td style={{ padding: '7px 12px', borderBottom: `1px solid ${c.borderSubtle}`, fontWeight: row.highlight ? 600 : 400, color: row.highlight ? '#00d4ff' : c.textPrimary }}>{row.value}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </Card>
+
+          {/* 政策风险提示 */}
+          <Card style={{ ...cardStyle, marginTop: 12, borderColor: '#ffb80040' }} styles={{ header: { ...headStyle, borderBottomColor: '#ffb80030' } }}
+            title={<span style={{ color: '#ffb800' }}>政策风险与待确认事项</span>}>
+            <div style={{ fontSize: 12, color: c.textSecondary, lineHeight: 2 }}>
+              <div><Tag color="warning">待确认</Tag> 上网环节线损费用是否豁免（潜在影响约 {(gdResult.annualLineLossCost || +(cfg.gdLineLossFee * cfg.gdAnnualDays * (cfg.gdSlot1RealQty + cfg.gdSlot3RealQty) / 10000).toFixed(0))} 万元/年）</div>
+              <div><Tag color="warning">待确认</Tag> 充电电量"不承担输配电价"是否含损耗部分（国家114号文 vs 广东地方规则差异）</div>
+              <div><Tag color="success">已确认</Tag> 独立储能不执行中长期交易偏差考核</div>
+              <div><Tag color="success">已确认</Tag> 充电电量不承担输配电价和政府性基金及附加</div>
+              <div><Tag color="processing">政策趋势</Tag> 山东（长时储能）、海南已明确"含损耗部分"豁免，利好储能</div>
+            </div>
+          </Card>
+        </Col>
+      </Row>
+    );
+  };
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
       {/* 页面头部 */}
@@ -1302,6 +1846,7 @@ export default function InvestmentCalculator() {
             { key: '7', label: '收益测算', children: <Tab7 /> },
             { key: '8', label: '投资回报汇总', children: Tab8 },
             { key: '9', label: '敏感性分析', children: <Tab9 /> },
+            { key: '10', label: '广东现货结算', children: <Tab10 /> },
           ]}
         />
       </Card>
