@@ -1,4 +1,4 @@
-import { generateMonthlyRevenue } from '../mock/data';
+import api from './api';
 
 export interface RevenueRecord {
   id: number;
@@ -9,13 +9,17 @@ export interface RevenueRecord {
   totalRevenue: number;
 }
 
-export async function getMonthlyRevenue(): Promise<RevenueRecord[]> {
-  return generateMonthlyRevenue().map((item, i) => ({
-    id: i + 1,
-    month: item.month,
-    peakRevenue: item.调峰收益,
-    freqRevenue: item.调频收益,
-    auxRevenue: item.辅助服务,
-    totalRevenue: item.总收益,
-  }));
+const mockRevenue: RevenueRecord[] = [
+  { id: 1, month: '1月', peakRevenue: 280000, freqRevenue: 150000, auxRevenue: 85000, totalRevenue: 515000 },
+  { id: 2, month: '2月', peakRevenue: 320000, freqRevenue: 180000, auxRevenue: 92000, totalRevenue: 592000 },
+  { id: 3, month: '3月', peakRevenue: 380000, freqRevenue: 210000, auxRevenue: 108000, totalRevenue: 698000 },
+];
+
+export async function getMonthlyRevenue(year = 2025): Promise<RevenueRecord[]> {
+  try {
+    const res = await api.get<RevenueRecord[]>('/revenue', { params: { year } });
+    return res.data;
+  } catch {
+    return mockRevenue;
+  }
 }

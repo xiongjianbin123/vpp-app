@@ -3,6 +3,7 @@ import { ConfigProvider, theme } from 'antd';
 import zhCN from 'antd/locale/zh_CN';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { ThemeProvider, useTheme } from './context/ThemeContext';
+import { DemoProvider } from './context/DemoContext';
 import AppLayout from './components/Layout/AppLayout';
 import Dashboard from './pages/Dashboard';
 import Devices from './pages/Devices';
@@ -15,7 +16,9 @@ import KnowledgeBase from './pages/KnowledgeBase';
 import InvestmentCalculator from './pages/InvestmentCalculator';
 import ContractSigning from './pages/ContractSigning';
 import CustomerService from './pages/CustomerService';
+import AggregatorWorkbench from './pages/AggregatorWorkbench';
 import Login from './pages/Login';
+import OAuthCallback from './pages/OAuthCallback';
 
 // Redirect to /login if not authenticated
 function RequireAuth({ children }: { children: React.ReactNode }) {
@@ -91,6 +94,7 @@ function ThemedApp() {
         <Routes>
           {/* Public */}
           <Route path="/login" element={<Login />} />
+          <Route path="/oauth-callback" element={<OAuthCallback />} />
 
           {/* Protected — all inside AppLayout */}
           <Route
@@ -130,6 +134,7 @@ function ThemedApp() {
                     <Route path="/customer-service" element={
                       <ProtectedRoute path="/customer-service"><CustomerService /></ProtectedRoute>
                     } />
+                    <Route path="/aggregator" element={<AggregatorWorkbench />} />
                   </Routes>
                 </AppLayout>
               </RequireAuth>
@@ -145,7 +150,9 @@ export default function App() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <ThemedApp />
+        <DemoProvider>
+          <ThemedApp />
+        </DemoProvider>
       </AuthProvider>
     </ThemeProvider>
   );

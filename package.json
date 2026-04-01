@@ -8,7 +8,11 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
-    "dev:agent": "concurrently \"npm run dev\" \"python agent-harness/vppapp_api.py\""
+    "dev:agent": "concurrently \"npm run dev\" \"python agent-harness/vppapp_api.py\"",
+    "server:install": "cd server && npm install",
+    "server:setup": "cd server && npm run setup",
+    "server:dev": "cd server && npm run dev",
+    "dev:full": "concurrently \"npm run dev\" \"npm run server:dev\""
   },
   "dependencies": {
     "@ant-design/icons": "^6.1.0",

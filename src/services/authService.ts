@@ -1,4 +1,4 @@
-import { mockUsers, roles } from '../mock/users';
+import api from './api';
 
 export interface UserInfo {
   username: string;
@@ -15,22 +15,20 @@ export interface LoginResponse {
 }
 
 export async function login(username: string, password: string): Promise<LoginResponse> {
-  const found = mockUsers.find(u => u.username === username && u.password === password);
-  if (!found) throw new Error('用户名或密码错误');
-  const role = roles[found.roleKey];
-  const user: UserInfo = {
-    username: found.username,
-    name: found.name,
-    email: found.email,
-    roleKey: found.roleKey,
-    roleLabel: role.label,
-    allowedRoutes: role.allowedRoutes,
-  };
-  return { token: `mock-token-${username}`, user };
+  const res = await api.post<LoginResponse>('/auth/login', { username, password });
+  return res.data;
 }
 
 export async function getMe(): Promise<UserInfo> {
-  const stored = localStorage.getItem('vpp_auth_user');
-  if (!stored) throw new Error('未登录');
-  return JSON.parse(stored) as UserInfo;
+  const res = await api.get<UserInfo>('/auth/me');
+  return res.data;
+}
+
+export async function logout(): Promise<void> {
+  await api.post('/auth/logout');
+}
+
+/** URL to start GitHub OAuth flow — opens server-side redirect */
+export function getGitHubOAuthUrl(): string {
+  return '/api/auth/github';
 }

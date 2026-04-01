@@ -11,6 +11,7 @@ import {
 import huitoneLogo from '/Huitone-logo.png';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
+import { useDemoView } from '../../context/DemoContext';
 import CommandPalette from '../CommandPalette';
 
 const { Sider, Header, Content } = Layout;
@@ -27,6 +28,7 @@ const allMenuItems = [
   { key: '/investment', icon: <CalculatorOutlined />, label: '投资测算' },
   { key: '/contract', icon: <FileProtectOutlined />, label: '合同签署' },
   { key: '/customer-service', icon: <CustomerServiceOutlined />, label: '客户服务' },
+  { key: '/aggregator', icon: <ApartmentOutlined />, label: '聚合商工作台' },
 ];
 
 const pageNames: Record<string, string> = {
@@ -41,6 +43,7 @@ const pageNames: Record<string, string> = {
   '/investment': '储能投资测算',
   '/contract': '合同签署管理',
   '/customer-service': '客户服务中心',
+  '/aggregator': '聚合商工作台',
 };
 
 interface Notice {
@@ -69,6 +72,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const { user, logout, canAccess } = useAuth();
   const { mode, tone, colors: c, toggleTheme, toggleTone } = useTheme();
+  const { highlightRoute } = useDemoView();
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -154,7 +158,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <Menu
           theme={mode === 'dark' ? 'dark' : 'light'}
           mode="inline"
-          selectedKeys={[location.pathname]}
+          selectedKeys={[location.pathname, ...(highlightRoute && location.pathname === '/' ? [highlightRoute] : [])]}
           items={menuItems}
           onClick={({ key }) => navigate(key)}
           style={{ background: 'transparent', borderRight: 'none', marginTop: 8 }}

@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Row, Col, Card, Alert, List, Tag, Button } from 'antd';
+import { Row, Col, Card, Alert, List, Tag, Button, Segmented, Table } from 'antd';
 import {
   LineChart, Line, AreaChart, Area, PieChart, Pie, Cell,
-  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer
+  XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+  ReferenceArea,
 } from 'recharts';
 import { getDashboard } from '../../services/dashboardService';
 import {
@@ -11,6 +12,11 @@ import {
 } from '@ant-design/icons';
 import AIAssistant, { SUGGESTED_QUESTIONS } from '../../components/AIAssistant';
 import { useTheme } from '../../context/ThemeContext';
+import { useDemoView, demoViewOptions } from '../../context/DemoContext';
+import type { DemoView } from '../../context/DemoContext';
+import GuangdongMap from '../../components/GuangdongMap';
+import ChinaMap from '../../components/ChinaMap';
+import type { ColumnType } from 'antd/es/table';
 
 const COLORS = ['#38bdf8', '#00d4ff', '#ffb800', '#00ff88', '#a78bfa'];
 
@@ -54,8 +60,90 @@ function generateFreqData() {
   }));
 }
 
+// 设备资产汇总数据（用户指定的所有设备）
+interface DeviceAssetRow {
+  key: string;
+  name: string;
+  type: string;
+  capacity: string;
+  status: string;
+  location: string;
+  currentPower: number;
+}
+
+const deviceAssets: DeviceAssetRow[] = [
+  { key: 'E001', name: '富山站储能', type: '电网储能', capacity: '150MW/300MWh', status: '在线', location: '广州番禺', currentPower: 86.4 },
+  { key: 'E002', name: '聚龙站储能', type: '电网储能', capacity: '150MW/300MWh', status: '在线', location: '广州番禺', currentPower: 72.0 },
+  { key: 'E003', name: '厚德站储能', type: '电网储能', capacity: '100MW/200MWh', status: '在线', location: '广州海珠', currentPower: 48.5 },
+  { key: 'E004', name: '化龙站储能', type: '电网储能', capacity: '100MW/200MWh', status: '在线', location: '广州番禺', currentPower: 61.2 },
+  { key: 'E005', name: '科城站储能', type: '电网储能', capacity: '200MW/400MWh', status: '在线', location: '广州黄埔', currentPower: 118.6 },
+  { key: 'E006', name: '鱼飞站储能', type: '电网储能', capacity: '150MW/300MWh', status: '在线', location: '广州南沙', currentPower: 94.3 },
+  { key: 'E007', name: '象山站储能', type: '电网储能', capacity: '200MW/400MWh', status: '在线', location: '深圳宝安', currentPower: 112.0 },
+  { key: 'D004', name: '充电桩群-CBD', type: '充电桩', capacity: '5MW', status: '告警', location: '北京西城', currentPower: 0 },
+  { key: 'D005', name: '工业负荷-钢厂', type: '工业负荷', capacity: '40MW', status: '在线', location: '河北唐山', currentPower: 32.0 },
+  { key: 'D006', name: '光伏电站-南区', type: '光伏电站', capacity: '25MW', status: '维护', location: '北京大兴', currentPower: 0 },
+  { key: 'D007', name: '储能系统-B', type: '储能系统', capacity: '15MW/30MWh', status: '在线', location: '天津滨海', currentPower: 8.5 },
+  { key: 'D008', name: '风电场-西区', type: '风电', capacity: '20MW', status: '离线', location: '张家口', currentPower: 0 },
+  { key: 'D009', name: '充电桩群-园区', type: '充电桩', capacity: '3MW', status: '在线', location: '北京昌平', currentPower: 1.8 },
+  { key: 'D010', name: '工业负荷-化工', type: '工业负荷', capacity: '35MW', status: '在线', location: '天津东丽', currentPower: 28.5 },
+];
+
+const typeColorMap: Record<string, string> = {
+  '电网储能': '#38bdf8', '储能系统': '#00d4ff', '光伏电站': '#ffb800',
+  '风电': '#00ff88', '充电桩': '#a78bfa', '工业负荷': '#fb923c',
+};
+
+const statusDotMap: Record<string, string> = {
+  '在线': '#00ff88', '离线': '#4a5568', '维护': '#ffb800', '告警': '#ff4d4d',
+};
+
+// KPI presets per demo view
+const viewKpiPresets: Record<DemoView, KpiCard[]> = {
+  overview: [
+    { title: '聚合容量', value: 350, unit: 'MW', color: '#00d4ff', trend: 0 },
+    { title: '接入用户', value: 187, unit: '户', color: '#00ff88', trend: 12 },
+    { title: '今日响应收益', value: 43.8, unit: '万元', color: '#ffb800', trend: 8.2, dynamic: true },
+    { title: '年度累计收益', value: 4380, unit: '万元', color: '#00d4ff', trend: 15.3 },
+    { title: '响应合格率', value: '91.7', unit: '%', color: '#00ff88', trend: 0 },
+    { title: '在线率', value: '96.3', unit: '%', color: '#00ff88', trend: 0 },
+  ],
+  dispatch: [
+    { title: '可控容量', value: 320, unit: 'MW', color: '#00d4ff', trend: 0 },
+    { title: '待命资源', value: 165, unit: '个', color: '#00ff88', trend: 3 },
+    { title: '今日响应', value: 3, unit: '次', color: '#ffb800', trend: 0 },
+    { title: '完成率', value: '91.7', unit: '%', color: '#00ff88', trend: 2.1 },
+    { title: '平均延迟', value: 18, unit: '秒', color: '#00d4ff', trend: -3 },
+    { title: '系统在线率', value: '99.7', unit: '%', color: '#00ff88', trend: 0 },
+  ],
+  investment: [
+    { title: '年化 IRR', value: '12.3', unit: '%', color: '#00ff88', trend: 0 },
+    { title: '资产总规模', value: 8.5, unit: '亿元', color: '#00d4ff', trend: 0 },
+    { title: '年度总收益', value: 4380, unit: '万元', color: '#ffb800', trend: 15.3 },
+    { title: '多市场收益占比', value: '68', unit: '%', color: '#00d4ff', trend: 0 },
+    { title: 'NPV', value: 2.1, unit: '亿元', color: '#00ff88', trend: 0 },
+    { title: '资产利用率', value: '78', unit: '%', color: '#ffb800', trend: 5.2 },
+  ],
+  aggregator: [
+    { title: '资源池', value: 187, unit: '户', color: '#00d4ff', trend: 0 },
+    { title: '活跃用户', value: 156, unit: '户', color: '#00ff88', trend: 8 },
+    { title: '本月分成', value: 128, unit: '万元', color: '#ffb800', trend: 12.5, dynamic: true },
+    { title: '新签约', value: 12, unit: '户', color: '#00d4ff', trend: 4 },
+    { title: '累计分成', value: 1580, unit: '万元', color: '#00ff88', trend: 0 },
+    { title: '用户续约率', value: '94', unit: '%', color: '#00ff88', trend: 0 },
+  ],
+  enduser: [
+    { title: '本月节省', value: 8.2, unit: '万元', color: '#00ff88', trend: 15.3, dynamic: true },
+    { title: '累计收益', value: 52, unit: '万元', color: '#00d4ff', trend: 0 },
+    { title: '回收进度', value: '67', unit: '%', color: '#ffb800', trend: 0 },
+    { title: '参与响应', value: 18, unit: '次', color: '#00d4ff', trend: 3 },
+    { title: '设备在线率', value: '100', unit: '%', color: '#00ff88', trend: 0 },
+    { title: '合同剩余', value: 28, unit: '月', color: '#ffb800', trend: 0 },
+  ],
+};
+
 export default function Dashboard() {
   const { colors: c } = useTheme();
+  const { currentView, setCurrentView } = useDemoView();
   const [powerData, setPowerData] = useState<Array<Record<string, string | number>>>([]);
   const [freqData, setFreqData] = useState(generateFreqData());
   const [currentPower, setCurrentPower] = useState(0);
@@ -72,7 +160,6 @@ export default function Dashboard() {
       setCurrentPower(data.totalCurrentPower);
       setTotalCapacity(data.totalCapacity);
       setOnlineCount(data.onlineCount);
-      // 合并类型标签并去重求和
       const pieMap: Record<string, number> = {};
       Object.entries(data.energyPie).forEach(([type, value]) => {
         const label = TYPE_LABEL_MAP[type] ?? type;
@@ -95,18 +182,58 @@ export default function Dashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  const kpiCards: KpiCard[] = [
-    { title: '总装机容量', value: totalCapacity, unit: 'MW', color: c.primary, trend: 0 },
-    { title: '在线设备', value: onlineCount, unit: '台', color: c.success, trend: -1 },
-    { title: '当前出力功率', value: currentPower, unit: 'MW', color: c.primary, trend: 2.3, dynamic: true },
-    { title: '今日发电量', value: 7842.6, unit: 'MWh', color: c.warning, trend: 5.7 },
-    { title: '碳减排量', value: 3921.3, unit: 'tCO₂', color: c.success, trend: 5.7 },
-  ];
+  // overview 视角使用后端真实数据（设备资产信息），其他视角使用演示预设
+  const kpiCards: KpiCard[] = currentView === 'overview'
+    ? [
+        { title: '总装机容量', value: totalCapacity, unit: 'MW', color: c.primary, trend: 0 },
+        { title: '在线设备', value: onlineCount, unit: '台', color: c.success, trend: -1 },
+        { title: '当前出力功率', value: currentPower, unit: 'MW', color: c.primary, trend: 2.3, dynamic: true },
+        { title: '今日发电量', value: 7842.6, unit: 'MWh', color: c.warning, trend: 5.7 },
+        { title: '碳减排量', value: 3921.3, unit: 'tCO₂', color: c.success, trend: 5.7 },
+      ]
+    : viewKpiPresets[currentView];
 
   const activeAlerts = alerts.filter(a => a.active);
   const cardStyle = { background: c.bgCard, border: `1px solid ${c.primaryBorderLight}`, borderRadius: 12 };
   const headerStyle = { borderBottom: `1px solid ${c.primaryBorderLight}`, background: 'transparent' };
   const tooltipStyle = { background: c.bgElevated, border: `1px solid ${c.primary}`, borderRadius: 8 };
+
+  // 设备资产表格列
+  const assetColumns: ColumnType<DeviceAssetRow>[] = [
+    {
+      title: '设备名称', dataIndex: 'name', width: 130,
+      render: (v: string, r: DeviceAssetRow) => (
+        <span style={{ color: typeColorMap[r.type] || c.textPrimary, fontWeight: 600, fontSize: 12 }}>{v}</span>
+      ),
+    },
+    {
+      title: '类型', dataIndex: 'type', width: 80,
+      render: (v: string) => (
+        <Tag style={{ color: typeColorMap[v], borderColor: typeColorMap[v], background: `${typeColorMap[v]}15`, fontSize: 11 }}>{v}</Tag>
+      ),
+    },
+    {
+      title: '容量', dataIndex: 'capacity', width: 120,
+      render: (v: string) => <span style={{ color: c.textSecondary, fontSize: 11 }}>{v}</span>,
+    },
+    {
+      title: '状态', dataIndex: 'status', width: 70,
+      render: (v: string) => (
+        <span style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: statusDotMap[v], display: 'inline-block', boxShadow: `0 0 4px ${statusDotMap[v]}` }} />
+          <span style={{ color: statusDotMap[v], fontSize: 11 }}>{v}</span>
+        </span>
+      ),
+    },
+    {
+      title: '当前功率', dataIndex: 'currentPower', width: 80,
+      render: (v: number) => <span style={{ color: v > 0 ? c.primary : c.textDim, fontSize: 11, fontFamily: 'monospace' }}>{v > 0 ? `${v}MW` : '—'}</span>,
+    },
+    {
+      title: '位置', dataIndex: 'location', width: 80,
+      render: (v: string) => <span style={{ color: c.textDim, fontSize: 11 }}>{v}</span>,
+    },
+  ];
 
   return (
     <div>
@@ -119,7 +246,13 @@ export default function Dashboard() {
             数据每3秒自动刷新 · 最后更新：{lastUpdate.toLocaleTimeString('zh-CN')}
           </p>
         </div>
-        <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+          <Segmented
+            options={demoViewOptions}
+            value={currentView}
+            onChange={v => setCurrentView(v as DemoView)}
+            style={{ background: c.bgElevated }}
+          />
           {activeAlerts.length > 0 && (
             <Alert
               message={`当前 ${activeAlerts.length} 条未处理告警`}
@@ -173,7 +306,7 @@ export default function Dashboard() {
 
       <Row gutter={[16, 16]}>
         {/* 24h Power Curve */}
-        <Col xs={24} lg={16}>
+        <Col xs={24} lg={10}>
           <Card
             title={<span style={{ color: c.primary }}>24小时发电功率曲线</span>}
             style={cardStyle}
@@ -196,6 +329,8 @@ export default function Dashboard() {
                 <YAxis stroke={c.textDim} tick={{ fontSize: 11 }} unit="MW" />
                 <Tooltip contentStyle={tooltipStyle} labelStyle={{ color: c.primary }} />
                 <Legend />
+                <ReferenceArea x1="14:00" x2="16:00" fill="#ff4d4f" fillOpacity={0.08} label={{ value: '午间调峰', position: 'insideTop', fill: '#ff4d4f', fontSize: 10 }} />
+                <ReferenceArea x1="18:00" x2="20:00" fill="#ff4d4f" fillOpacity={0.08} label={{ value: '晚峰调峰', position: 'insideTop', fill: '#ff4d4f', fontSize: 10 }} />
                 <Area type="monotone" dataKey="总功率" stroke="#00d4ff" fill="url(#colorTotal)" strokeWidth={2} />
                 <Area type="monotone" dataKey="光伏" stroke="#ffb800" fill="url(#colorSolar)" strokeWidth={1.5} />
                 <Line type="monotone" dataKey="风电" stroke="#00ff88" strokeWidth={1.5} dot={false} />
@@ -204,8 +339,19 @@ export default function Dashboard() {
           </Card>
         </Col>
 
+        {/* Guangdong Map */}
+        <Col xs={24} lg={7}>
+          <Card
+            title={<span style={{ color: c.primary }}>广东省资源分布</span>}
+            style={cardStyle}
+            styles={{ header: headerStyle }}
+          >
+            <GuangdongMap style={{ height: 220 }} />
+          </Card>
+        </Col>
+
         {/* Energy Pie */}
-        <Col xs={24} lg={8}>
+        <Col xs={24} lg={7}>
           <Card
             title={<span style={{ color: c.primary }}>能源结构</span>}
             style={cardStyle}
@@ -254,6 +400,43 @@ export default function Dashboard() {
                 );
               })}
             </div>
+          </Card>
+        </Col>
+
+        {/* 全国储能资产地图 */}
+        <Col xs={24} lg={12}>
+          <Card
+            title={<span style={{ color: c.primary }}>全国储能资产分布地图</span>}
+            style={cardStyle}
+            styles={{ header: headerStyle }}
+          >
+            <ChinaMap style={{ height: 300 }} />
+          </Card>
+        </Col>
+
+        {/* 设备资产列表 */}
+        <Col xs={24} lg={12}>
+          <Card
+            title={
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ color: c.primary }}>设备资产总览</span>
+                <span style={{ color: c.textDim, fontSize: 11, fontWeight: 400 }}>
+                  共 {deviceAssets.length} 台 · 在线 {deviceAssets.filter(d => d.status === '在线').length} 台 ·
+                  总容量 {deviceAssets.reduce((s, d) => s + (parseFloat(d.capacity) || 0), 0).toFixed(0)}MW+
+                </span>
+              </div>
+            }
+            style={cardStyle}
+            styles={{ header: headerStyle, body: { padding: '0 0 4px' } }}
+          >
+            <Table
+              dataSource={deviceAssets}
+              columns={assetColumns}
+              size="small"
+              pagination={false}
+              scroll={{ y: 260 }}
+              rowKey="key"
+            />
           </Card>
         </Col>
 

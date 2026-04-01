@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import {
   Row, Col, Card, Tabs, Form, Input, InputNumber, Select, Radio,
-  Table, Button, Tag, Statistic, Checkbox, Tooltip,
+  Table, Button, Tag, Statistic, Checkbox, Tooltip, Slider,
 } from 'antd';
 import type { ColumnType } from 'antd/es/table';
 import {
@@ -390,7 +390,18 @@ export default function InvestmentCalculator() {
   };
 
   const [cfg, setCfg] = useState<InvestmentConfig>(DEFAULT_CONFIG);
-  const [activeTab, setActiveTab] = useState('1');
+  const [activeTab, setActiveTab] = useState('quick');
+
+  // ─── 快速测算 state ─────────────────────────────────────────────
+  const [qElec, setQElec] = useState(1000);   // 年用电量 万kWh
+  const [qRatio, setQRatio] = useState(15);   // 可让渡比例 %
+  const [qHours, setQHours] = useState(100);  // 年参与时长 h
+
+  const qCapacity = qElec * 10000 / 8760 * qRatio / 100; // 可让渡容量 MW
+  const qRevenue = qCapacity * qHours * 1.0 / 10;        // 年响应收益 万元
+  const qArbitrage = qElec * 0.15 * 1.5;                  // 年峰谷套利 万元
+  const qCost = qCapacity * 5;                             // 改造费用 万元
+  const qPayback = (qRevenue + qArbitrage) > 0 ? Math.round(qCost / (qRevenue + qArbitrage) * 12) : 999; // 回收月数
 
   const set = <K extends keyof InvestmentConfig>(key: K, val: InvestmentConfig[K]) =>
     setCfg(prev => ({ ...prev, [key]: val }));
@@ -1226,6 +1237,62 @@ export default function InvestmentCalculator() {
           onChange={setActiveTab}
           tabBarStyle={{ borderBottom: '1px solid rgba(0,212,255,0.12)', marginBottom: 20 }}
           items={[
+            { key: 'quick', label: '⚡ 快速测算', children: (
+              <div style={{ maxWidth: 720, margin: '0 auto' }}>
+                <h3 style={{ color: c.primary, marginBottom: 4 }}>VPP 参与收益快速测算</h3>
+                <p style={{ color: c.textMuted, fontSize: 13, marginBottom: 24 }}>拖动滑块，实时查看您的收益预估</p>
+
+                <div style={{ marginBottom: 28 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <span style={{ color: c.textSecondary, fontSize: 13 }}>年用电量</span>
+                    <span style={{ color: c.primary, fontWeight: 600 }}>{qElec} 万 kWh</span>
+                  </div>
+                  <Slider min={100} max={5000} step={100} value={qElec} onChange={setQElec}
+                    marks={{ 100: '100', 1000: '1000', 3000: '3000', 5000: '5000' }} />
+                </div>
+
+                <div style={{ marginBottom: 28 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <span style={{ color: c.textSecondary, fontSize: 13 }}>可让渡负荷比例</span>
+                    <span style={{ color: c.primary, fontWeight: 600 }}>{qRatio}%</span>
+                  </div>
+                  <Slider min={5} max={30} step={1} value={qRatio} onChange={setQRatio}
+                    marks={{ 5: '5%', 15: '15%', 30: '30%' }} />
+                </div>
+
+                <div style={{ marginBottom: 36 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 8 }}>
+                    <span style={{ color: c.textSecondary, fontSize: 13 }}>年参与时长</span>
+                    <span style={{ color: c.primary, fontWeight: 600 }}>{qHours} 小时</span>
+                  </div>
+                  <Slider min={50} max={200} step={10} value={qHours} onChange={setQHours}
+                    marks={{ 50: '50h', 100: '100h', 200: '200h' }} />
+                </div>
+
+                <Row gutter={[24, 24]}>
+                  <Col xs={12} md={6}>
+                    <Statistic title="年 VPP 响应收益" value={qRevenue.toFixed(1)} suffix="万元"
+                      valueStyle={{ color: '#52c41a', fontSize: 28, fontWeight: 700 }} />
+                  </Col>
+                  <Col xs={12} md={6}>
+                    <Statistic title="年峰谷套利节省" value={qArbitrage.toFixed(1)} suffix="万元"
+                      valueStyle={{ color: '#52c41a', fontSize: 28, fontWeight: 700 }} />
+                  </Col>
+                  <Col xs={12} md={6}>
+                    <Statistic title="设备改造费用" value={qCost.toFixed(1)} suffix="万元"
+                      valueStyle={{ color: '#1890ff', fontSize: 28, fontWeight: 700 }} />
+                  </Col>
+                  <Col xs={12} md={6}>
+                    <Statistic title="投资回收期" value={qPayback} suffix="个月"
+                      valueStyle={{ color: qPayback <= 24 ? '#52c41a' : '#fa8c16', fontSize: 28, fontWeight: 700 }} />
+                  </Col>
+                </Row>
+
+                <div style={{ marginTop: 24, padding: '12px 16px', background: c.bgElevated, borderRadius: 8, fontSize: 12, color: c.textDim }}>
+                  以上测算基于广东省 2026 年电力市场实际价格参数（调峰响应 1.0 元/kWh，峰谷价差 1.5 元/kWh）
+                </div>
+              </div>
+            )},
             { key: '1', label: <><CalculatorOutlined /> 经济评价依据</>, children: Tab1 },
             { key: '2', label: '商业模式', children: Tab2 },
             { key: '3', label: '财务评价参数', children: Tab3 },

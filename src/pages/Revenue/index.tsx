@@ -173,7 +173,7 @@ export default function Revenue() {
       {/* KPI Summary */}
       <Row gutter={[16, 16]} style={{ marginBottom: 20 }}>
         {[
-          { title: '本月收益', value: monthlyData[2]['总收益'], color: c.primary },
+          { title: '本月收益', value: monthlyData[2]?.['总收益'] ?? 0, color: c.primary },
           { title: '已结算金额', value: settled, color: c.success },
           { title: '结算中金额', value: settling, color: c.warning },
           { title: '待结算金额', value: pending, color: c.textSecondary },

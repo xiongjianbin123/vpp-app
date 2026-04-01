@@ -7,6 +7,7 @@ export type { UserInfo as AuthUser };
 interface AuthContextValue {
   user: UserInfo | null;
   login: (username: string, password: string) => Promise<boolean>;
+  loginWithToken: (token: string, user: UserInfo) => void;
   logout: () => void;
   canAccess: (route: string) => boolean;
 }
@@ -14,6 +15,7 @@ interface AuthContextValue {
 const AuthContext = createContext<AuthContextValue>({
   user: null,
   login: async () => false,
+  loginWithToken: () => {},
   logout: () => {},
   canAccess: () => false,
 });
@@ -40,7 +42,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
   };
 
-  const logout = () => {
+  const loginWithToken = (token: string, userInfo: UserInfo) => {
+    localStorage.setItem('vpp_token', token);
+    localStorage.setItem('vpp_auth_user', JSON.stringify(userInfo));
+    setUser(userInfo);
+  };
+
+  const logout = async () => {
+    try { await authService.logout(); } catch { /* ignore */ }
     localStorage.removeItem('vpp_token');
     localStorage.removeItem('vpp_auth_user');
     setUser(null);
@@ -48,11 +57,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const canAccess = (route: string): boolean => {
     if (!user) return false;
+    if (route === '/aggregator') return true; // 聚合商工作台对所有角色开放
     return user.allowedRoutes.includes(route);
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, canAccess }}>
+    <AuthContext.Provider value={{ user, login, loginWithToken, logout, canAccess }}>
       {children}
     </AuthContext.Provider>
   );
