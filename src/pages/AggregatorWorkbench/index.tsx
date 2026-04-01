@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { Row, Col, Card, Table, Tag, Tabs, Steps, Button, Progress, Statistic, message } from 'antd';
 import {
   TeamOutlined, CheckCircleOutlined, DollarOutlined, EnvironmentOutlined,
-  UserAddOutlined, FileProtectOutlined, ExperimentOutlined, LinkOutlined, RocketOutlined,
+  UserAddOutlined, LinkOutlined, RocketOutlined,
   DownloadOutlined,
 } from '@ant-design/icons';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
