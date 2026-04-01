@@ -1,6 +1,7 @@
 import { createContext, useContext, useState } from 'react';
 import * as authService from '../services/authService';
 import type { UserInfo } from '../services/authService';
+import { mockUsers, roles } from '../mock/users';
 
 export type { UserInfo as AuthUser };
 
@@ -38,7 +39,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(userInfo);
       return true;
     } catch {
-      return false;
+      // 后端不可用时使用mock用户数据登录
+      const found = mockUsers.find(u => u.username === username && u.password === password);
+      if (!found) return false;
+      const role = roles[found.roleKey];
+      const userInfo: UserInfo = {
+        username: found.username,
+        name: found.name,
+        email: found.email,
+        roleKey: found.roleKey,
+        roleLabel: role.label,
+        allowedRoutes: role.allowedRoutes,
+      };
+      localStorage.setItem('vpp_token', 'mock_token_' + found.username);
+      localStorage.setItem('vpp_auth_user', JSON.stringify(userInfo));
+      setUser(userInfo);
+      return true;
     }
   };
 
