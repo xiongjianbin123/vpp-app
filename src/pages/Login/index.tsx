@@ -48,7 +48,7 @@ export default function Login() {
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
           <img src={huitoneLogo} alt="Huitone" style={{ height: 40, marginBottom: 16 }} />
           <div style={{ color: c.textPrimary, fontSize: 18, fontWeight: 600, marginBottom: 4 }}>
-            虚拟电厂管理平台
+            虚拟电厂管理平台（演示版）
           </div>
           <div style={{ color: c.textDim, fontSize: 12 }}>Virtual Power Plant · Huitone Energy</div>
         </div>
