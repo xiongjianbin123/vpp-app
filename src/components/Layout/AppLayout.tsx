@@ -74,7 +74,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const { user, logout, canAccess } = useAuth();
   const { mode, tone, colors: c, toggleTheme, toggleTone } = useTheme();
-  const { highlightRoute, customerType, setCustomerType, customerLabel } = useDemoView();
+  const { highlightRoute, customerType, setCustomerType } = useDemoView();
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
