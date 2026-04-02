@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Layout, Menu, Badge, Drawer, Avatar, Dropdown, List, Tooltip } from 'antd';
+import { Layout, Menu, Badge, Drawer, Avatar, Dropdown, List, Tooltip, Select } from 'antd';
 import { useNavigate, useLocation } from 'react-router-dom';
 import {
   DashboardOutlined, ThunderboltOutlined, ApartmentOutlined, DollarOutlined,
@@ -11,7 +11,9 @@ import {
 import huitoneLogo from '/Huitone-logo.png';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
-import { useDemoView } from '../../context/DemoContext';
+import { useDemoView, customerRouteFilter, customerTypeOptions } from '../../context/DemoContext';
+import type { CustomerType } from '../../context/DemoContext';
+
 import CommandPalette from '../CommandPalette';
 
 const { Sider, Header, Content } = Layout;
@@ -72,7 +74,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const location = useLocation();
   const { user, logout, canAccess } = useAuth();
   const { mode, tone, colors: c, toggleTheme, toggleTone } = useTheme();
-  const { highlightRoute } = useDemoView();
+  const { highlightRoute, customerType, setCustomerType, customerLabel } = useDemoView();
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -85,7 +87,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     return () => window.removeEventListener('keydown', handler);
   }, []);
 
-  const menuItems = allMenuItems.filter(item => canAccess(item.key));
+  const customerRoutes = customerRouteFilter[customerType];
+  const menuItems = allMenuItems.filter(item =>
+    canAccess(item.key) && (!customerRoutes || customerRoutes.includes(item.key))
+  );
   const unreadCount = notices.filter(n => !n.read).length;
 
   const markAllRead = () => setNotices(prev => prev.map(n => ({ ...n, read: true })));
@@ -225,6 +230,16 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                 命令面板
               </div>
             </Tooltip>
+
+            {/* Customer Type Selector */}
+            <Select
+              value={customerType}
+              onChange={(val: CustomerType) => setCustomerType(val)}
+              options={customerTypeOptions}
+              size="small"
+              style={{ width: 180, fontSize: 11 }}
+              popupMatchSelectWidth={false}
+            />
 
             {/* Tone Toggle */}
             <Tooltip title={tone === 'blue' ? '切换能源绿色调' : '切换科技蓝色调'}>
