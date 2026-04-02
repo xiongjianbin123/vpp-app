@@ -23,7 +23,7 @@ const viewLabels: Record<DemoView, string> = {
 
 const customerLabels: Record<CustomerType, string> = {
   all: '全部功能',
-  grid: '广州供电局（调度侧）',
+  grid: '电网（调度侧）',
   investor: '投资控股公司',
   aggregator: '聚合商/售电公司',
   enduser: '工业园区/大用户',
