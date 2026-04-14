@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs';
-import { pool, query } from '../config/database';
+import { pool } from '../config/database';
 
 // ─── Users ────────────────────────────────────────────────────────────────────
 const seedUsers = [

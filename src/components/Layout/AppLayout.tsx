@@ -6,7 +6,7 @@ import {
   BellOutlined, UserOutlined, LogoutOutlined, SettingOutlined, IdcardOutlined,
   CheckCircleOutlined, WarningOutlined, InfoCircleOutlined, LineChartOutlined,
   RocketOutlined, SafetyCertificateOutlined, BookOutlined, CalculatorOutlined,
-  BulbOutlined, BulbFilled, MacCommandOutlined, FileProtectOutlined, CustomerServiceOutlined,
+  BulbOutlined, BulbFilled, MacCommandOutlined, FileProtectOutlined, CustomerServiceOutlined, RobotOutlined,
 } from '@ant-design/icons';
 import huitoneLogo from '/Huitone-logo.png';
 import { useAuth } from '../../context/AuthContext';
@@ -31,6 +31,7 @@ const allMenuItems = [
   { key: '/contract', icon: <FileProtectOutlined />, label: '合同签署' },
   { key: '/customer-service', icon: <CustomerServiceOutlined />, label: '客户服务' },
   { key: '/aggregator', icon: <ApartmentOutlined />, label: '聚合商工作台' },
+  { key: '/ai-workbench', icon: <RobotOutlined />, label: 'AI智能体工作台' },
 ];
 
 const pageNames: Record<string, string> = {
@@ -46,6 +47,7 @@ const pageNames: Record<string, string> = {
   '/contract': '合同签署管理',
   '/customer-service': '客户服务中心',
   '/aggregator': '聚合商工作台',
+  '/ai-workbench': 'AI智能体工作台',
 };
 
 interface Notice {

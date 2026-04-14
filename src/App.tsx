@@ -17,6 +17,7 @@ import InvestmentCalculator from './pages/InvestmentCalculator';
 import ContractSigning from './pages/ContractSigning';
 import CustomerService from './pages/CustomerService';
 import AggregatorWorkbench from './pages/AggregatorWorkbench';
+import AIWorkbench from './pages/AIWorkbench';
 import Login from './pages/Login';
 import OAuthCallback from './pages/OAuthCallback';
 
@@ -135,6 +136,9 @@ function ThemedApp() {
                       <ProtectedRoute path="/customer-service"><CustomerService /></ProtectedRoute>
                     } />
                     <Route path="/aggregator" element={<AggregatorWorkbench />} />
+                    <Route path="/ai-workbench" element={
+                      <ProtectedRoute path="/ai-workbench"><AIWorkbench /></ProtectedRoute>
+                    } />
                   </Routes>
                 </AppLayout>
               </RequireAuth>

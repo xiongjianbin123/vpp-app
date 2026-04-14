@@ -166,7 +166,7 @@ export default function CommandPalette({ open, onClose }: Props) {
   const renderDataSummary = (data: unknown, cmd: Command | null) => {
     if (!data) return null;
     if (Array.isArray(data)) {
-      return renderArraySummary(data, cmd);
+      return renderArraySummary(data);
     }
     if (typeof data === 'object' && data !== null) {
       return renderObjectSummary(data as Record<string, unknown>, cmd);
@@ -174,7 +174,7 @@ export default function CommandPalette({ open, onClose }: Props) {
     return <span style={{ color: c.textPrimary, fontSize: 13 }}>{String(data)}</span>;
   };
 
-  const renderArraySummary = (arr: unknown[], _cmd: Command | null) => {
+  const renderArraySummary = (arr: unknown[]) => {
     if (arr.length === 0) return <span style={{ color: c.textDim, fontSize: 13 }}>无数据</span>;
     const sample = arr[0] as Record<string, unknown>;
     const keys = Object.keys(sample).slice(0, 5);

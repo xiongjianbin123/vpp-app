@@ -996,7 +996,7 @@ export default function InvestmentCalculator() {
     </Row>
   );
 
-  const Tab7 = () => {
+  const Tab7 = (() => {
     const availModels = cfg.storageType === 'commercial' ? COMMERCIAL_MODELS : GRID_MODELS;
     const selectedModelLabels = availModels.filter(m => cfg.selectedModels.includes(m.value)).map(m => m.label);
 
@@ -1206,7 +1206,7 @@ export default function InvestmentCalculator() {
         </Col>
       </Row>
     );
-  };
+  })();
 
   // ─── Tab8：投资回报汇总 ────────────────────────────────────────────────────
   const totalRevenue = results.yearlyRows.reduce((s, r) => s + r.revenue, 0);
@@ -1353,7 +1353,7 @@ export default function InvestmentCalculator() {
     </Row>
   );
 
-  const Tab9 = () => {
+  const Tab9 = (() => {
 
     const sensColumns: ColumnType<SensitivityRow>[] = [
       { title: '参数', dataIndex: 'parameter', width: 130 },
@@ -1405,12 +1405,12 @@ export default function InvestmentCalculator() {
         </Col>
       </Row>
     );
-  };
+  })();
 
   // ─── 广东现货结算结果 ──────────────────────────────────────────────────
   const gdResult = useMemo(() => computeGdSettlement(cfg), [cfg]);
 
-  const Tab10 = () => {
+  const Tab10 = (() => {
     const slotLabels = ['谷时充电', '高峰放电', '平时充电', '晚高峰放电'];
     const slotKeys = [1, 2, 3, 4] as const;
 
@@ -1736,7 +1736,7 @@ export default function InvestmentCalculator() {
         </Col>
       </Row>
     );
-  };
+  })();
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -1843,10 +1843,10 @@ export default function InvestmentCalculator() {
             { key: '4', label: '资金筹措及使用', children: Tab4 },
             { key: '5', label: '电池相关参数', children: Tab5 },
             { key: '6', label: '成本与费用', children: Tab6 },
-            { key: '7', label: '收益测算', children: <Tab7 /> },
+            { key: '7', label: '收益测算', children: Tab7 },
             { key: '8', label: '投资回报汇总', children: Tab8 },
-            { key: '9', label: '敏感性分析', children: <Tab9 /> },
-            { key: '10', label: '广东现货结算', children: <Tab10 /> },
+            { key: '9', label: '敏感性分析', children: Tab9 },
+            { key: '10', label: '广东现货结算', children: Tab10 },
           ]}
         />
       </Card>

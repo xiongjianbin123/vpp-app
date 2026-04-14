@@ -166,7 +166,7 @@ export default function DemandResponse() {
     {
       title: '状态', dataIndex: 'status',
       render: (v: string) => (
-        <Badge status={statusConfig[v].badge as any} text={<span style={{ color: statusConfig[v].color }}>{v}</span>} />
+        <Badge status={statusConfig[v].badge as 'success' | 'processing' | 'error' | 'default' | 'warning'} text={<span style={{ color: statusConfig[v].color }}>{v}</span>} />
       ),
     },
     {

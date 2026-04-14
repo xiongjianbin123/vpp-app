@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import {
   Row, Col, Card, Table, Button, Tag, Tabs, Progress, Alert,
   Select, Switch, InputNumber,
@@ -115,16 +115,15 @@ export default function SmartBidding() {
   const [activeTab, setActiveTab] = useState('optimize');
   const [capacity, setCapacity] = useState(150);
   const [bidMode, setBidMode] = useState<BidMode>('报量报价');
-  const [bidPoints, setBidPoints] = useState<BidPoint[]>(() => generate96Points(150, K_VALUE));
   const [optHistory] = useState(generateOptHistory());
   const [autoOptimize, setAutoOptimize] = useState(true);
   const [submitted, setSubmitted] = useState(false);
   const [currentKv] = useState(K_VALUE);
 
-  useEffect(() => {
-    setBidPoints(generate96Points(capacity, currentKv));
-    setSubmitted(false);
-  }, [capacity, bidMode, currentKv]);
+  const bidPoints = useMemo(() => generate96Points(capacity, currentKv), [capacity, currentKv]);
+
+  const handleCapacityChange = (v: number | null) => { setCapacity(v ?? 150); setSubmitted(false); };
+  const handleBidModeChange = (v: BidMode) => { setBidMode(v); setSubmitted(false); };
 
   const totalRevenue = bidPoints.reduce((a, b) => a + b.expectedRevenue, 0);
   const agcPoints = bidPoints.filter(b => b.market === 'AGC');
@@ -343,12 +342,12 @@ export default function SmartBidding() {
               <div style={{ display: 'flex', gap: 24, alignItems: 'center', flexWrap: 'wrap' }}>
                 <div>
                   <div style={{ color: c.textMuted, fontSize: 12, marginBottom: 6 }}>申报容量（MW）</div>
-                  <InputNumber min={10} max={200} value={capacity} onChange={v => setCapacity(v ?? 150)}
+                  <InputNumber min={10} max={200} value={capacity} onChange={handleCapacityChange}
                     style={{ width: 120 }} addonAfter="MW" />
                 </div>
                 <div>
                   <div style={{ color: c.textMuted, fontSize: 12, marginBottom: 6 }}>申报模式</div>
-                  <Select value={bidMode} onChange={setBidMode} style={{ width: 140 }}>
+                  <Select value={bidMode} onChange={handleBidModeChange} style={{ width: 140 }}>
                     <Option value="报量报价">报量报价</Option>
                     <Option value="报量不报价">报量不报价</Option>
                   </Select>

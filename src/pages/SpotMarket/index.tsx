@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import {
   Row, Col, Card, Button, Slider, InputNumber, Select, Tag, Table, Tabs,
   Statistic, Alert, Radio,
@@ -131,6 +131,15 @@ export default function SpotMarket() {
   const peakAvg = parseFloat((prices.filter(p => p.period === '尖峰').reduce((a, b) => a + b.price, 0) / 4).toFixed(4));
   const arbitrageSpread = parseFloat((peakAvg - valleyAvg).toFixed(4));
 
+  // 明日24小时电价预测数据（使用确定性偏移量避免渲染时调用 Math.random）
+  const priceForecastData = useMemo(() => prices.map((p, i) => {
+    const base = BASE_PRICES[p.period];
+    const seed = ((i * 7 + 3) % 17) / 17;
+    const upper = parseFloat((base * (1 + 0.08 + seed * 0.04)).toFixed(4));
+    const lower = parseFloat((base * (1 - 0.06 - seed * 0.03)).toFixed(4));
+    return { hour: p.hour, 预测中位: parseFloat((base + (seed - 0.5) * 0.05).toFixed(4)), 上界: upper, 下界: lower };
+  }), [prices]);
+
   // 模拟计算
   const runSimulation = () => {
     const chargeHours = strategy === 'double' ? 7 : strategy === 'single' ? 3.5 : 6;
@@ -160,11 +169,14 @@ export default function SpotMarket() {
   }));
 
   // 月度套利收益预测
-  const monthlyForecast = Array.from({ length: 12 }, (_, i) => ({
-    month: `${i + 1}月`,
-    套利收益: Math.round((arbitrageSpread * capacity * 5 * 30 * (0.85 + Math.random() * 0.2)) / 10) * 10,
-    目标收益: Math.round(capacity * 5 * 30 * 0.18 * 1000),
-  }));
+  const monthlyForecast = useMemo(() => Array.from({ length: 12 }, (_, i) => {
+    const seed = ((i * 13 + 5) % 11) / 11;
+    return {
+      month: `${i + 1}月`,
+      套利收益: Math.round((arbitrageSpread * capacity * 5 * 30 * (0.85 + seed * 0.2)) / 10) * 10,
+      目标收益: Math.round(capacity * 5 * 30 * 0.18 * 1000),
+    };
+  }), [arbitrageSpread, capacity]);
 
   const backtestColumns: ColumnType<BacktestRow>[] = [
     { title: '日期', dataIndex: 'date', render: (v: string) => <span style={{ color: c.textMuted, fontSize: 12 }}>{v}</span> },
@@ -547,12 +559,7 @@ export default function SpotMarket() {
             <Card title={<span style={{ color: c.primary }}>明日24小时电价预测（置信区间）</span>} style={cardStyle} styles={{ header: headStyle }}>
               <ResponsiveContainer width="100%" height={300}>
                 <AreaChart
-                  data={prices.map((p) => {
-                    const base = BASE_PRICES[p.period];
-                    const upper = parseFloat((base * (1 + 0.08 + Math.random() * 0.04)).toFixed(4));
-                    const lower = parseFloat((base * (1 - 0.06 - Math.random() * 0.03)).toFixed(4));
-                    return { hour: p.hour, 预测中位: parseFloat((base + (Math.random() - 0.5) * 0.05).toFixed(4)), 上界: upper, 下界: lower };
-                  })}
+                  data={priceForecastData}
                   margin={{ top: 10, right: 10, left: -10, bottom: 0 }}
                 >
                   <defs>

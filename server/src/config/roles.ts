@@ -3,7 +3,8 @@ export type RoleKey =
   | 'sales_manager'
   | 'trading_director'
   | 'trading_manager'
-  | 'ops_manager';
+  | 'ops_manager'
+  | 'internal_admin';
 
 export interface Role {
   key: RoleKey;
@@ -36,6 +37,11 @@ export const roles: Record<RoleKey, Role> = {
     key: 'ops_manager',
     label: '运维经理',
     allowedRoutes: ['/', '/devices', '/demand-response', '/compliance-control', '/knowledge', '/investment', '/customer-service'],
+  },
+  internal_admin: {
+    key: 'internal_admin',
+    label: '内部管理员',
+    allowedRoutes: ['/', '/devices', '/demand-response', '/spot-market', '/smart-bidding', '/compliance-control', '/revenue', '/knowledge', '/investment', '/contract', '/customer-service', '/ai-workbench'],
   },
 };
 

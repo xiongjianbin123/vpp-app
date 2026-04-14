@@ -14,6 +14,7 @@ import AIModelSelector from '../AIModelSelector';
 import { mockDevices, mockTasks } from '../../mock/data';
 
 // ─── 常见问题 ─────────────────────────────────────────────────────
+// eslint-disable-next-line react-refresh/only-export-components
 export const SUGGESTED_QUESTIONS = [
   '当前各储能站点的SOC状态如何？',
   '电网储能项目整体运行情况？',

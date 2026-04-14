@@ -4,7 +4,6 @@ import { UserOutlined, LockOutlined } from '@ant-design/icons';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTheme } from '../../context/ThemeContext';
-import { mockUsers, roles } from '../../mock/users';
 import huitoneLogo from '/Huitone-logo.png';
 
 export default function Login() {
@@ -107,27 +106,6 @@ export default function Login() {
             </Button>
           </Form.Item>
         </Form>
-
-        {/* Test accounts hint */}
-        <div style={{
-          marginTop: 24,
-          padding: '14px 16px',
-          background: c.primaryMuted,
-          border: `1px solid ${c.primaryBorderLight}`,
-          borderRadius: 8,
-        }}>
-          <div style={{ color: c.textDim, fontSize: 11, marginBottom: 8 }}>测试账号（用户名 / 密码）</div>
-          {mockUsers.map(u => (
-            <div key={u.username} style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 3 }}>
-              <span style={{ color: c.textMuted, fontSize: 11 }}>
-                <span style={{ color: c.primary, fontFamily: 'monospace' }}>{u.username}</span>
-                {' / '}
-                <span style={{ fontFamily: 'monospace' }}>{u.password}</span>
-              </span>
-              <span style={{ color: c.textDim, fontSize: 11 }}>{roles[u.roleKey].label}</span>
-            </div>
-          ))}
-        </div>
 
         <div style={{ textAlign: 'center', marginTop: 20, color: c.textDim, fontSize: 11, opacity: 0.6 }}>
           VPP v2.1.0 · © 2026 Huitone Energy

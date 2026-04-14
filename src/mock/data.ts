@@ -516,7 +516,7 @@ export function generateMockTags(filename: string): string[] {
 
 export function generateMonthlyRevenue() {
   const months = ['1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
-  return months.map((month, _i) => ({
+  return months.map((month) => ({
     month,
     调峰收益: Math.round((80 + Math.random() * 60) * 1000),
     调频收益: Math.round((40 + Math.random() * 30) * 1000),
