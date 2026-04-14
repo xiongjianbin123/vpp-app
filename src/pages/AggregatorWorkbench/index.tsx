@@ -16,7 +16,7 @@ interface ResourceUser {
   name: string;
   type: string;
   capacity: number;
-  status: '已接入' | '测试中' | '待签约' | '已离线';
+  status: '已接入' | '测试中' | '待签约' | '已离线' | '在建';
   city: string;
   joinDate: string;
   monthlyRevenue: number;
@@ -32,7 +32,9 @@ const resourceUsers: ResourceUser[] = [
   { key: '7', name: '象山站储能', type: '电网储能', capacity: 200, status: '已接入', city: '深圳宝安', joinDate: '2025-10-05', monthlyRevenue: 56.8 },
   { key: '8', name: '工业负荷-钢厂', type: '工业负荷', capacity: 40, status: '已接入', city: '河北唐山', joinDate: '2025-03-01', monthlyRevenue: 8.2 },
   { key: '9', name: '光伏电站-北区', type: '光伏电站', capacity: 50, status: '已接入', city: '北京朝阳', joinDate: '2024-12-01', monthlyRevenue: 12.5 },
-  { key: '10', name: '储能系统-B', type: '储能系统', capacity: 15, status: '已接入', city: '天津滨海', joinDate: '2025-01-20', monthlyRevenue: 3.8 },
+  { key: '10', name: '顶盛物业储能', type: '储能系统', capacity: 0.65, status: '在建', city: '中山', joinDate: '2026-03-01', monthlyRevenue: 0 },
+  { key: '15', name: '蔚蓝服饰储能', type: '储能系统', capacity: 0.783, status: '在建', city: '湛江', joinDate: '2026-03-15', monthlyRevenue: 0 },
+  { key: '16', name: '弘国五金储能', type: '储能系统', capacity: 2.61, status: '在建', city: '惠州', joinDate: '2026-02-20', monthlyRevenue: 0 },
   { key: '11', name: '充电桩群-园区', type: '充电桩', capacity: 3, status: '测试中', city: '北京昌平', joinDate: '2026-02-01', monthlyRevenue: 0 },
   { key: '12', name: '工业负荷-化工', type: '工业负荷', capacity: 35, status: '已接入', city: '天津东丽', joinDate: '2025-06-01', monthlyRevenue: 6.5 },
   { key: '13', name: '充电桩群-CBD', type: '充电桩', capacity: 5, status: '已离线', city: '北京西城', joinDate: '2025-01-10', monthlyRevenue: 0 },
@@ -41,7 +43,7 @@ const resourceUsers: ResourceUser[] = [
 ];
 
 const statusColors: Record<string, string> = {
-  '已接入': '#00ff88', '测试中': '#00d4ff', '待签约': '#ffb800', '已离线': '#4a5568',
+  '已接入': '#00ff88', '测试中': '#00d4ff', '待签约': '#ffb800', '已离线': '#4a5568', '在建': '#1890ff',
 };
 
 const typeColorMap: Record<string, string> = {

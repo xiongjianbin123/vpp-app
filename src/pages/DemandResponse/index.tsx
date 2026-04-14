@@ -68,7 +68,7 @@ const mockCommands: DispatchCommand[] = [
     resources: [
       { name: '厚德站储能', power: 12, status: '已接收', delay: 6 },
       { name: '化龙站储能', power: 10, status: '已接收', delay: 9 },
-      { name: '储能系统-B', power: 8, status: '未响应', delay: 0 },
+      { name: '弘国五金储能', power: 2.6, status: '未响应', delay: 0 },
     ],
   },
 ];

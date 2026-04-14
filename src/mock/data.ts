@@ -4,7 +4,7 @@ export interface Device {
   id: string;
   name: string;
   type: '光伏电站' | '储能系统' | '风电' | '充电桩' | '工业负荷' | '电网储能';
-  status: '在线' | '离线' | '维护' | '告警';
+  status: '在线' | '离线' | '维护' | '告警' | '在建';
   capacity: number; // MW
   energyCapacity?: number; // MWh（储能额定容量）
   currentPower: number; // MW，正值放电，负值充电
@@ -253,29 +253,40 @@ export const mockDevices: Device[] = [
   // 其他分布式资源
   { id: 'D001', name: '光伏电站-北区', type: '光伏电站', status: '在线', capacity: 50, currentPower: 38.5, location: '北京市朝阳区', lastUpdate: '2026-03-14 10:30:00', connectionType: 'MODBUS TCP', commissionDate: '2022-05-01', investmentCost: 15000 },
   {
-    id: 'D002', name: '储能系统-A', type: '储能系统', status: '在线',
-    capacity: 20, energyCapacity: 40, currentPower: 15.2, location: '北京市海淀区', lastUpdate: '2026-03-14 10:30:00',
-    soc: 72, soh: 88, connectionType: 'MODBUS TCP',
+    id: 'D002', name: '顶盛物业储能', type: '储能系统', status: '在建',
+    capacity: 0.65, energyCapacity: 1.3, currentPower: 0, location: '广东省中山市', lastUpdate: '2026-04-14 10:00:00',
+    soc: 0, soh: 100, connectionType: 'MODBUS TCP',
     batteryType: 'LFP磷酸铁锂', batterySpec: '100Ah / 3.2V',
-    bmsModel: '科陆电子 BMS-2000', pcsModel: '科士达 PCS-200KW', emsModel: '本地EMS',
-    investmentCost: 4800, commissionDate: '2023-11-15', warrantyYears: 5,
-    cycleCount: 892, maxCellVoltage: 3311, minCellVoltage: 3248,
-    cellMaxTemp: 28.6, cellMinTemp: 25.3, temperature: 23.5, humidity: 48,
-    bmsAlarms: ['SOH低于90%，建议安排电池健康诊断'],
+    bmsModel: '待安装', pcsModel: '待安装', emsModel: '待安装',
+    investmentCost: 390, commissionDate: '', warrantyYears: 10,
+    cycleCount: 0, maxCellVoltage: 0, minCellVoltage: 0,
+    cellMaxTemp: 0, cellMinTemp: 0, temperature: 0, humidity: 0,
+    bmsAlarms: [],
   },
   { id: 'D003', name: '风电场-东区', type: '风电', status: '在线', capacity: 30, currentPower: 22.1, location: '内蒙古呼和浩特', lastUpdate: '2026-03-14 10:30:00', connectionType: '风机通讯协议', commissionDate: '2021-08-20', investmentCost: 18000 },
   { id: 'D004', name: '充电桩群-CBD', type: '充电桩', status: '告警', capacity: 5, currentPower: 0, location: '北京市西城区', lastUpdate: '2026-03-14 10:28:00', connectionType: 'OCPP 1.6', commissionDate: '2024-01-10', investmentCost: 800 },
   { id: 'D005', name: '工业负荷-钢厂', type: '工业负荷', status: '在线', capacity: 40, currentPower: 32.0, location: '河北省唐山市', lastUpdate: '2026-03-14 10:30:00', connectionType: '电表直采', commissionDate: '2023-06-01', investmentCost: 200 },
   { id: 'D006', name: '光伏电站-南区', type: '光伏电站', status: '维护', capacity: 25, currentPower: 0, location: '北京市大兴区', lastUpdate: '2026-03-14 09:00:00', connectionType: 'MODBUS TCP', commissionDate: '2022-09-15', investmentCost: 7500 },
   {
-    id: 'D007', name: '储能系统-B', type: '储能系统', status: '在线',
-    capacity: 15, energyCapacity: 30, currentPower: 8.5, location: '天津市滨海新区', lastUpdate: '2026-03-14 10:30:00',
-    soc: 58, soh: 92, connectionType: 'MODBUS TCP',
+    id: 'D007', name: '蔚蓝服饰储能', type: '储能系统', status: '在建',
+    capacity: 0.783, energyCapacity: 1.566, currentPower: 0, location: '广东省湛江市', lastUpdate: '2026-04-14 10:00:00',
+    soc: 0, soh: 100, connectionType: 'MODBUS TCP',
     batteryType: 'LFP磷酸铁锂', batterySpec: '100Ah / 3.2V',
-    bmsModel: '科陆电子 BMS-2000', pcsModel: '科士达 PCS-150KW', emsModel: '本地EMS',
-    investmentCost: 3600, commissionDate: '2024-03-20', warrantyYears: 5,
-    cycleCount: 645, maxCellVoltage: 3298, minCellVoltage: 3259,
-    cellMaxTemp: 29.2, cellMinTemp: 26.8, temperature: 24.1, humidity: 51,
+    bmsModel: '待安装', pcsModel: '待安装', emsModel: '待安装',
+    investmentCost: 470, commissionDate: '', warrantyYears: 10,
+    cycleCount: 0, maxCellVoltage: 0, minCellVoltage: 0,
+    cellMaxTemp: 0, cellMinTemp: 0, temperature: 0, humidity: 0,
+    bmsAlarms: [],
+  },
+  {
+    id: 'D011', name: '弘国五金储能', type: '储能系统', status: '在建',
+    capacity: 2.61, energyCapacity: 5.22, currentPower: 0, location: '广东省惠州市', lastUpdate: '2026-04-14 10:00:00',
+    soc: 0, soh: 100, connectionType: 'MODBUS TCP',
+    batteryType: 'LFP磷酸铁锂', batterySpec: '100Ah / 3.2V',
+    bmsModel: '待安装', pcsModel: '待安装', emsModel: '待安装',
+    investmentCost: 1566, commissionDate: '', warrantyYears: 10,
+    cycleCount: 0, maxCellVoltage: 0, minCellVoltage: 0,
+    cellMaxTemp: 0, cellMinTemp: 0, temperature: 0, humidity: 0,
     bmsAlarms: [],
   },
   { id: 'D008', name: '风电场-西区', type: '风电', status: '离线', capacity: 20, currentPower: 0, location: '张家口市', lastUpdate: '2026-03-14 08:15:00', connectionType: '风机通讯协议', commissionDate: '2020-12-01', investmentCost: 12000 },

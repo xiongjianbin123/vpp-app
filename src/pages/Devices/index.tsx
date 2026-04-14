@@ -22,6 +22,7 @@ const statusConfig: Record<string, { color: string; dot: string }> = {
   '离线': { color: 'default', dot: '#4a5568' },
   '维护': { color: 'warning', dot: '#ffb800' },
   '告警': { color: 'error', dot: '#ff4d4d' },
+  '在建': { color: 'processing', dot: '#1890ff' },
 };
 
 const typeColors: Record<string, string> = {
@@ -720,7 +721,7 @@ export default function Devices() {
         </Select>
         <Select value={statusFilter} onChange={setStatusFilter} style={{ width: 120 }}>
           <Option value="all">全部状态</Option>
-          {['在线', '离线', '维护', '告警'].map(s => (
+          {['在线', '离线', '维护', '告警', '在建'].map(s => (
             <Option key={s} value={s}>{s}</Option>
           ))}
         </Select>

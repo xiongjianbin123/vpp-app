@@ -10,7 +10,7 @@ interface AssetPoint {
   capacity: string;
   type: 'grid_storage' | 'storage' | 'solar' | 'wind' | 'ev' | 'industrial';
   city: string;
-  status: '在线' | '离线' | '维护' | '告警';
+  status: '在线' | '离线' | '维护' | '告警' | '在建';
 }
 
 const TYPE_COLORS: Record<string, string> = {
@@ -57,12 +57,13 @@ const assets: AssetPoint[] = [
   { lon: 113.90, lat: 22.60, name: '象山站储能', capacity: '200MW/400MWh', type: 'grid_storage', city: '深圳宝安', status: '在线' },
   // 分布式资源 - 京津冀+内蒙+张家口
   { lon: 116.50, lat: 39.95, name: '光伏电站-北区', capacity: '50MW', type: 'solar', city: '北京朝阳', status: '在线' },
-  { lon: 116.30, lat: 39.98, name: '储能系统-A', capacity: '20MW/40MWh', type: 'storage', city: '北京海淀', status: '在线' },
+  { lon: 113.38, lat: 22.52, name: '顶盛物业储能', capacity: '0.65MW/1.3MWh', type: 'storage', city: '中山', status: '在建' },
   { lon: 111.75, lat: 40.85, name: '风电场-东区', capacity: '30MW', type: 'wind', city: '内蒙古呼和浩特', status: '在线' },
   { lon: 116.38, lat: 39.92, name: '充电桩群-CBD', capacity: '5MW', type: 'ev', city: '北京西城', status: '告警' },
   { lon: 118.18, lat: 39.63, name: '工业负荷-钢厂', capacity: '可调 40MW', type: 'industrial', city: '河北唐山', status: '在线' },
   { lon: 116.35, lat: 39.73, name: '光伏电站-南区', capacity: '25MW', type: 'solar', city: '北京大兴', status: '维护' },
-  { lon: 117.70, lat: 39.03, name: '储能系统-B', capacity: '15MW/30MWh', type: 'storage', city: '天津滨海', status: '在线' },
+  { lon: 110.36, lat: 21.27, name: '蔚蓝服饰储能', capacity: '0.783MW/1.566MWh', type: 'storage', city: '湛江', status: '在建' },
+  { lon: 114.42, lat: 23.11, name: '弘国五金储能', capacity: '2.61MW/5.22MWh', type: 'storage', city: '惠州', status: '在建' },
   { lon: 114.88, lat: 40.82, name: '风电场-西区', capacity: '20MW', type: 'wind', city: '张家口', status: '离线' },
   { lon: 116.22, lat: 40.22, name: '充电桩群-园区', capacity: '3MW', type: 'ev', city: '北京昌平', status: '在线' },
   { lon: 117.40, lat: 39.08, name: '工业负荷-化工', capacity: '可调 35MW', type: 'industrial', city: '天津东丽', status: '在线' },

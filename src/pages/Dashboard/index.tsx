@@ -82,7 +82,9 @@ const deviceAssets: DeviceAssetRow[] = [
   { key: 'D004', name: '充电桩群-CBD', type: '充电桩', capacity: '5MW', status: '告警', location: '北京西城', currentPower: 0 },
   { key: 'D005', name: '工业负荷-钢厂', type: '工业负荷', capacity: '40MW', status: '在线', location: '河北唐山', currentPower: 32.0 },
   { key: 'D006', name: '光伏电站-南区', type: '光伏电站', capacity: '25MW', status: '维护', location: '北京大兴', currentPower: 0 },
-  { key: 'D007', name: '储能系统-B', type: '储能系统', capacity: '15MW/30MWh', status: '在线', location: '天津滨海', currentPower: 8.5 },
+  { key: 'D002', name: '顶盛物业储能', type: '储能系统', capacity: '0.65MW/1.3MWh', status: '在建', location: '中山', currentPower: 0 },
+  { key: 'D007', name: '蔚蓝服饰储能', type: '储能系统', capacity: '0.783MW/1.566MWh', status: '在建', location: '湛江', currentPower: 0 },
+  { key: 'D011', name: '弘国五金储能', type: '储能系统', capacity: '2.61MW/5.22MWh', status: '在建', location: '惠州', currentPower: 0 },
   { key: 'D008', name: '风电场-西区', type: '风电', capacity: '20MW', status: '离线', location: '张家口', currentPower: 0 },
   { key: 'D009', name: '充电桩群-园区', type: '充电桩', capacity: '3MW', status: '在线', location: '北京昌平', currentPower: 1.8 },
   { key: 'D010', name: '工业负荷-化工', type: '工业负荷', capacity: '35MW', status: '在线', location: '天津东丽', currentPower: 28.5 },
@@ -94,7 +96,7 @@ const typeColorMap: Record<string, string> = {
 };
 
 const statusDotMap: Record<string, string> = {
-  '在线': '#00ff88', '离线': '#4a5568', '维护': '#ffb800', '告警': '#ff4d4d',
+  '在线': '#00ff88', '离线': '#4a5568', '维护': '#ffb800', '告警': '#ff4d4d', '在建': '#1890ff',
 };
 
 // KPI presets per demo view
