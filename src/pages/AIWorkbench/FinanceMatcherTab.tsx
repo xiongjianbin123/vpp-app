@@ -4,6 +4,8 @@ import { BankOutlined, CheckCircleOutlined } from '@ant-design/icons';
 import { useTheme } from '../../context/ThemeContext';
 import AgentChatPanel from './AgentChatPanel';
 import { agents } from './agentMockData';
+import { callAgentAction } from '../../services/agentApi';
+import FileUpload from '../../components/FileUpload';
 
 const agent = agents.find(a => a.key === 'finance-matcher')!;
 
@@ -27,15 +29,36 @@ const mockPlans: FinancePlan[] = [
 
 export default function FinanceMatcherTab() {
   const { colors } = useTheme();
+  const [plans, setPlans] = useState<FinancePlan[]>([]);
   const [matched, setMatched] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [uploadDataId, setUploadDataId] = useState<string | null>(null);
 
-  const onMatch = () => {
+  // Controlled form state
+  const [investAmount, setInvestAmount] = useState(800);
+  const [projectType, setProjectType] = useState('工商业储能');
+  const [creditRating, setCreditRating] = useState('AA');
+  const [contractYears, setContractYears] = useState(10);
+  const [carbonReduction, setCarbonReduction] = useState(400);
+
+  const onMatch = async () => {
     setLoading(true);
-    setTimeout(() => {
+    try {
+      const result = await callAgentAction<{ plans: FinancePlan[] }>(
+        'finance-matcher', 'match',
+        { investAmount, projectType, creditRating, contractYears, carbonReduction, dataId: uploadDataId }
+      );
+      if (result.success && result.data?.plans) {
+        setPlans(result.data.plans);
+      } else {
+        setPlans(mockPlans); // fallback to mock
+      }
+    } catch {
+      setPlans(mockPlans);
+    } finally {
       setMatched(true);
       setLoading(false);
-    }, 1200);
+    }
   };
 
   const columns = [
@@ -52,6 +75,8 @@ export default function FinanceMatcherTab() {
     { title: '综合评分', dataIndex: 'score', key: 'score', render: (v: number) => <span style={{ color: colors.primary, fontWeight: 600 }}>{v}</span> },
   ];
 
+  const bestPlan = plans.find(p => p.recommended) || plans[0];
+
   return (
     <Row gutter={16}>
       <Col xs={24} lg={14}>
@@ -60,16 +85,20 @@ export default function FinanceMatcherTab() {
           size="small"
           style={{ background: colors.bgCard, borderColor: colors.primaryBorder, marginBottom: 16 }}
         >
+          <FileUpload
+            agentKey="finance-matcher"
+            onUploadComplete={(dataId) => setUploadDataId(dataId)}
+          />
           <Form layout="vertical">
             <Row gutter={16}>
               <Col span={8}>
                 <Form.Item label={<span style={{ color: colors.textSecondary }}>项目投资额 (万元)</span>}>
-                  <InputNumber defaultValue={800} min={10} style={{ width: '100%' }} />
+                  <InputNumber value={investAmount} onChange={v => setInvestAmount(v ?? 800)} min={10} style={{ width: '100%' }} />
                 </Form.Item>
               </Col>
               <Col span={8}>
                 <Form.Item label={<span style={{ color: colors.textSecondary }}>项目类型</span>}>
-                  <Select defaultValue="工商业储能" options={[
+                  <Select value={projectType} onChange={setProjectType} options={[
                     { label: '工商业储能', value: '工商业储能' },
                     { label: '大型独立储能', value: '大型独立储能' },
                     { label: '节能改造', value: '节能改造' },
@@ -79,7 +108,7 @@ export default function FinanceMatcherTab() {
               </Col>
               <Col span={8}>
                 <Form.Item label={<span style={{ color: colors.textSecondary }}>客户信用评级</span>}>
-                  <Select defaultValue="AA" options={[
+                  <Select value={creditRating} onChange={setCreditRating} options={[
                     { label: 'AAA', value: 'AAA' }, { label: 'AA+', value: 'AA+' },
                     { label: 'AA', value: 'AA' }, { label: 'A', value: 'A' },
                     { label: 'BBB', value: 'BBB' },
@@ -88,12 +117,12 @@ export default function FinanceMatcherTab() {
               </Col>
               <Col span={8}>
                 <Form.Item label={<span style={{ color: colors.textSecondary }}>EMC合同期 (年)</span>}>
-                  <InputNumber defaultValue={10} min={3} max={20} style={{ width: '100%' }} />
+                  <InputNumber value={contractYears} onChange={v => setContractYears(v ?? 10)} min={3} max={20} style={{ width: '100%' }} />
                 </Form.Item>
               </Col>
               <Col span={8}>
                 <Form.Item label={<span style={{ color: colors.textSecondary }}>年碳减排量 (tCO2)</span>}>
-                  <InputNumber defaultValue={400} min={0} style={{ width: '100%' }} />
+                  <InputNumber value={carbonReduction} onChange={v => setCarbonReduction(v ?? 400)} min={0} style={{ width: '100%' }} />
                 </Form.Item>
               </Col>
             </Row>
@@ -110,35 +139,38 @@ export default function FinanceMatcherTab() {
               size="small"
               style={{ background: colors.bgCard, borderColor: colors.primaryBorder, marginBottom: 16 }}
             >
-              <Table columns={columns} dataSource={mockPlans} size="small" pagination={false} />
+              <Table columns={columns} dataSource={plans} size="small" pagination={false} />
             </Card>
 
-            <Card
-              title={<span style={{ color: colors.textPrimary }}><CheckCircleOutlined style={{ color: '#00ff88' }} /> 最优方案详情</span>}
-              size="small"
-              style={{ background: colors.bgCard, borderColor: colors.primaryBorder }}
-            >
-              <Descriptions size="small" column={2}>
-                <Descriptions.Item label="融资类型">绿色信贷</Descriptions.Item>
-                <Descriptions.Item label="推荐机构">兴业银行绿色金融部</Descriptions.Item>
-                <Descriptions.Item label="年利率">LPR-30bp (≈3.55%)</Descriptions.Item>
-                <Descriptions.Item label="贷款期限">10年</Descriptions.Item>
-                <Descriptions.Item label="可融金额">800万元</Descriptions.Item>
-                <Descriptions.Item label="还款方式">等额本息</Descriptions.Item>
-                <Descriptions.Item label="增信措施" span={2}>
-                  EMC合同项下收益权质押 + 储能设备抵押
-                </Descriptions.Item>
-                <Descriptions.Item label="适用政策" span={2}>
-                  符合央行碳减排支持工具条件（利率1.75%，支持60%本金）
-                </Descriptions.Item>
-              </Descriptions>
-            </Card>
+            {bestPlan && (
+              <Card
+                title={<span style={{ color: colors.textPrimary }}><CheckCircleOutlined style={{ color: '#00ff88' }} /> 最优方案详情</span>}
+                size="small"
+                style={{ background: colors.bgCard, borderColor: colors.primaryBorder }}
+              >
+                <Descriptions size="small" column={2}>
+                  <Descriptions.Item label="融资类型">{bestPlan.type}</Descriptions.Item>
+                  <Descriptions.Item label="推荐机构">{bestPlan.institution}</Descriptions.Item>
+                  <Descriptions.Item label="年利率">{bestPlan.rate}</Descriptions.Item>
+                  <Descriptions.Item label="贷款期限">{bestPlan.term}</Descriptions.Item>
+                  <Descriptions.Item label="可融金额">{bestPlan.amount}</Descriptions.Item>
+                  <Descriptions.Item label="还款方式">等额本息</Descriptions.Item>
+                  <Descriptions.Item label="增信措施" span={2}>
+                    {bestPlan.enhancement}
+                  </Descriptions.Item>
+                  <Descriptions.Item label="适用政策" span={2}>
+                    符合央行碳减排支持工具条件（利率1.75%，支持60%本金）
+                  </Descriptions.Item>
+                </Descriptions>
+              </Card>
+            )}
           </>
         )}
       </Col>
 
       <Col xs={24} lg={10}>
         <AgentChatPanel
+          agentKey={agent.key}
           agentName={agent.name}
           systemPrompt={agent.systemPrompt}
           suggestions={[

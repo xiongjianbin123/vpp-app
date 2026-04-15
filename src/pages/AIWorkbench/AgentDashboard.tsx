@@ -1,4 +1,4 @@
-import { Row, Col, Card, Tag, Steps, Timeline, Badge, Statistic } from 'antd';
+import { Row, Col, Card, Tag, Timeline, Badge, Statistic } from 'antd';
 import {
   TeamOutlined, CalculatorOutlined, BankOutlined, FileProtectOutlined,
   AlertOutlined, GlobalOutlined, CheckCircleOutlined, SyncOutlined,
@@ -6,6 +6,7 @@ import {
 } from '@ant-design/icons';
 import { useTheme } from '../../context/ThemeContext';
 import { agents, workflows, recentActivities } from './agentMockData';
+import WorkflowRunner from './WorkflowRunner';
 import type { AgentInfo } from './agentMockData';
 
 const iconMap: Record<string, React.ReactNode> = {
@@ -101,20 +102,12 @@ export default function AgentDashboard() {
             style={{ background: colors.bgCard, borderColor: colors.primaryBorder }}
           >
             {Object.entries(workflows).map(([key, wf]) => (
-              <div key={key} style={{ marginBottom: 24 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                  <Tag color={colors.primary}>{wf.name}</Tag>
-                  <span style={{ color: colors.textSecondary, fontSize: 12 }}>{wf.description}</span>
-                </div>
-                <Steps
-                  size="small"
-                  current={-1}
-                  items={wf.steps.map(step => ({
-                    title: <span style={{ color: colors.textPrimary, fontSize: 12 }}>{step.title}</span>,
-                    description: <span style={{ color: colors.textMuted, fontSize: 11 }}>{step.description}</span>,
-                  }))}
-                />
-              </div>
+              <WorkflowRunner
+                key={key}
+                title={wf.name}
+                description={wf.description}
+                steps={wf.steps}
+              />
             ))}
           </Card>
         </Col>

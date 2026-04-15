@@ -5,6 +5,8 @@ import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../../context/ThemeContext';
 import AgentChatPanel from './AgentChatPanel';
 import { agents } from './agentMockData';
+import { callAgentAction } from '../../services/agentApi';
+import FileUpload from '../../components/FileUpload';
 
 const agent = agents.find(a => a.key === 'contract-generator')!;
 
@@ -36,24 +38,52 @@ const statusConfig = {
 export default function ContractGeneratorTab() {
   const { colors } = useTheme();
   const navigate = useNavigate();
+  const [riskReview, setRiskReview] = useState<RiskItem[]>(mockRiskReview);
   const [generated, setGenerated] = useState(false);
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState(0);
+  const [uploadDataId, setUploadDataId] = useState<string | null>(null);
+
+  // Controlled form state
+  const [contractType, setContractType] = useState('storage_ci');
+  const [customerName, setCustomerName] = useState('兆丰铝电');
+  const [revenueShare, setRevenueShare] = useState('40/60');
 
   const onGenerate = () => {
     setLoading(true);
     setStep(0);
+
+    // Keep the multi-step animation
     const interval = setInterval(() => {
       setStep(prev => {
         if (prev >= 3) {
           clearInterval(interval);
-          setGenerated(true);
-          setLoading(false);
+          // Trigger the real API call at the end of animation
+          doGenerate();
           return 3;
         }
         return prev + 1;
       });
     }, 600);
+  };
+
+  const doGenerate = async () => {
+    try {
+      const result = await callAgentAction<{ riskReview: RiskItem[] }>(
+        'contract-generator', 'generate',
+        { contractType, customerName, revenueShare, dataId: uploadDataId }
+      );
+      if (result.success && result.data?.riskReview) {
+        setRiskReview(result.data.riskReview);
+      } else {
+        setRiskReview(mockRiskReview); // fallback to mock
+      }
+    } catch {
+      setRiskReview(mockRiskReview);
+    } finally {
+      setGenerated(true);
+      setLoading(false);
+    }
   };
 
   const columns = [
@@ -66,9 +96,9 @@ export default function ContractGeneratorTab() {
     { title: '建议', dataIndex: 'suggestion', key: 'suggestion', render: (v: string) => <span style={{ color: colors.textSecondary, fontSize: 12 }}>{v}</span> },
   ];
 
-  const passCount = mockRiskReview.filter(r => r.status === 'pass').length;
-  const warnCount = mockRiskReview.filter(r => r.status === 'warning').length;
-  const missCount = mockRiskReview.filter(r => r.status === 'missing').length;
+  const passCount = riskReview.filter(r => r.status === 'pass').length;
+  const warnCount = riskReview.filter(r => r.status === 'warning').length;
+  const missCount = riskReview.filter(r => r.status === 'missing').length;
 
   return (
     <Row gutter={16}>
@@ -78,11 +108,15 @@ export default function ContractGeneratorTab() {
           size="small"
           style={{ background: colors.bgCard, borderColor: colors.primaryBorder, marginBottom: 16 }}
         >
+          <FileUpload
+            agentKey="contract-generator"
+            onUploadComplete={(dataId) => setUploadDataId(dataId)}
+          />
           <Form layout="vertical">
             <Row gutter={16}>
               <Col span={8}>
                 <Form.Item label={<span style={{ color: colors.textSecondary }}>合同类型</span>}>
-                  <Select defaultValue="storage_ci" options={[
+                  <Select value={contractType} onChange={setContractType} options={[
                     { label: '工商业储能EMC（标准）', value: 'storage_ci' },
                     { label: '大型独立储能EMC', value: 'storage_large' },
                     { label: '用户侧储能EMC', value: 'storage_user' },
@@ -94,7 +128,7 @@ export default function ContractGeneratorTab() {
               </Col>
               <Col span={8}>
                 <Form.Item label={<span style={{ color: colors.textSecondary }}>客户名称</span>}>
-                  <Select defaultValue="兆丰铝电" options={[
+                  <Select value={customerName} onChange={setCustomerName} options={[
                     { label: '信发集团（山西）', value: '信发集团' },
                     { label: '兆丰铝电', value: '兆丰铝电' },
                     { label: '台山宝丰钢铁', value: '台山宝丰' },
@@ -104,7 +138,7 @@ export default function ContractGeneratorTab() {
               </Col>
               <Col span={8}>
                 <Form.Item label={<span style={{ color: colors.textSecondary }}>收益分成比例</span>}>
-                  <Select defaultValue="40/60" options={[
+                  <Select value={revenueShare} onChange={setRevenueShare} options={[
                     { label: '投资方40% / 客户60%', value: '40/60' },
                     { label: '投资方30% / 客户70%', value: '30/70' },
                     { label: '投资方50% / 客户50%', value: '50/50' },
@@ -146,7 +180,7 @@ export default function ContractGeneratorTab() {
               size="small"
               style={{ background: colors.bgCard, borderColor: colors.primaryBorder, marginBottom: 16 }}
             >
-              <Table columns={columns} dataSource={mockRiskReview} size="small" pagination={false} />
+              <Table columns={columns} dataSource={riskReview} size="small" pagination={false} />
             </Card>
 
             <Button icon={<LinkOutlined />} onClick={() => navigate('/contract')} style={{ color: colors.primary }}>
@@ -158,6 +192,7 @@ export default function ContractGeneratorTab() {
 
       <Col xs={24} lg={10}>
         <AgentChatPanel
+          agentKey={agent.key}
           agentName={agent.name}
           systemPrompt={agent.systemPrompt}
           suggestions={[

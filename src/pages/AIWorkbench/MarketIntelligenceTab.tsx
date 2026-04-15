@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { Row, Col, Card, Table, Tag, Timeline, Statistic, Button } from 'antd';
 import { LinkOutlined, RiseOutlined, FallOutlined, SwapOutlined } from '@ant-design/icons';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
@@ -5,10 +6,19 @@ import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../../context/ThemeContext';
 import AgentChatPanel from './AgentChatPanel';
 import { agents } from './agentMockData';
+import { callAgentAction } from '../../services/agentApi';
+import FileUpload from '../../components/FileUpload';
 
 const agent = agents.find(a => a.key === 'market-intelligence')!;
 
-const priceData = [
+interface PriceRow {
+  month: string;
+  广东: number;
+  山东: number;
+  山西: number;
+}
+
+const mockPriceData: PriceRow[] = [
   { month: '2025-10', 广东: 0.78, 山东: 0.92, 山西: 0.65 },
   { month: '2025-12', 广东: 0.82, 山东: 0.95, 山西: 0.68 },
   { month: '2026-01', 广东: 0.80, 山东: 0.98, 山西: 0.66 },
@@ -24,7 +34,7 @@ interface PolicyUpdate {
   summary: string;
 }
 
-const policyUpdates: PolicyUpdate[] = [
+const mockPolicyUpdates: PolicyUpdate[] = [
   { date: '2026-04-12', title: '广东VPP参与现货市场门槛调整', impact: 'positive', summary: '单个交易单元调节能力门槛从2MW降至1MW' },
   { date: '2026-04-08', title: '山东储能容量补偿标准公示', impact: 'positive', summary: '独立储能容量电价参照煤电标准，约180元/kW·年' },
   { date: '2026-04-02', title: '浙江峰谷电价调整', impact: 'negative', summary: '峰谷价差缩小0.05元/kWh，影响储能套利收益' },
@@ -47,7 +57,7 @@ interface CompetitorMove {
   threat: number;
 }
 
-const competitorMoves: CompetitorMove[] = [
+const mockCompetitorMoves: CompetitorMove[] = [
   { key: '1', player: '南网综能', category: '电网系', action: '广东VPP聚合用户突破500个', date: '2026-04-10', threat: 5 },
   { key: '2', player: '阳光电源', category: '设备系', action: '发布工商业储能全栈解决方案', date: '2026-04-05', threat: 3 },
   { key: '3', player: '特来电', category: '充电系', action: '充电桩VPP聚合容量达200MW', date: '2026-04-01', threat: 3 },
@@ -57,6 +67,35 @@ const competitorMoves: CompetitorMove[] = [
 export default function MarketIntelligenceTab() {
   const { colors } = useTheme();
   const navigate = useNavigate();
+  const [uploadDataId, setUploadDataId] = useState<string | null>(null);
+
+  const [priceData, setPriceData] = useState<PriceRow[]>(mockPriceData);
+  const [policyUpdates, setPolicyUpdates] = useState<PolicyUpdate[]>(mockPolicyUpdates);
+  const [competitorMoves, setCompetitorMoves] = useState<CompetitorMove[]>(mockCompetitorMoves);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const result = await callAgentAction<{
+          priceTrend: PriceRow[];
+          policies: PolicyUpdate[];
+          competitors: CompetitorMove[];
+        }>(
+          'market-intelligence', 'scan',
+          { dataId: uploadDataId }
+        );
+        if (result.success && result.data) {
+          if (result.data.priceTrend) setPriceData(result.data.priceTrend);
+          if (result.data.policies) setPolicyUpdates(result.data.policies);
+          if (result.data.competitors) setCompetitorMoves(result.data.competitors);
+        }
+      } catch {
+        // keep mock data
+      }
+    };
+    fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uploadDataId]);
 
   const competitorColumns = [
     { title: '玩家', dataIndex: 'player', key: 'player', render: (v: string) => <span style={{ color: colors.textPrimary, fontWeight: 500 }}>{v}</span> },
@@ -69,16 +108,24 @@ export default function MarketIntelligenceTab() {
   return (
     <Row gutter={16}>
       <Col xs={24} lg={14}>
+        {/* FileUpload */}
+        <div style={{ marginBottom: 16 }}>
+          <FileUpload
+            agentKey="market-intelligence"
+            onUploadComplete={(dataId) => setUploadDataId(dataId)}
+          />
+        </div>
+
         {/* Key Metrics */}
         <Row gutter={16} style={{ marginBottom: 16 }}>
           <Col span={6}>
             <Card size="small" style={{ background: colors.bgCard, borderColor: colors.primaryBorder, textAlign: 'center' }}>
-              <Statistic title={<span style={{ color: colors.textMuted }}>广东峰谷价差</span>} value={0.81} suffix="元/kWh" valueStyle={{ color: '#00ff88', fontSize: 18 }} />
+              <Statistic title={<span style={{ color: colors.textMuted }}>广东峰谷价差</span>} value={priceData.length > 0 ? priceData[priceData.length - 1].广东 : 0.81} suffix="元/kWh" valueStyle={{ color: '#00ff88', fontSize: 18 }} />
             </Card>
           </Col>
           <Col span={6}>
             <Card size="small" style={{ background: colors.bgCard, borderColor: colors.primaryBorder, textAlign: 'center' }}>
-              <Statistic title={<span style={{ color: colors.textMuted }}>山东峰谷价差</span>} value={1.01} suffix="元/kWh" valueStyle={{ color: '#00ff88', fontSize: 18 }} />
+              <Statistic title={<span style={{ color: colors.textMuted }}>山东峰谷价差</span>} value={priceData.length > 0 ? priceData[priceData.length - 1].山东 : 1.01} suffix="元/kWh" valueStyle={{ color: '#00ff88', fontSize: 18 }} />
             </Card>
           </Col>
           <Col span={6}>
@@ -88,7 +135,7 @@ export default function MarketIntelligenceTab() {
           </Col>
           <Col span={6}>
             <Card size="small" style={{ background: colors.bgCard, borderColor: colors.primaryBorder, textAlign: 'center' }}>
-              <Statistic title={<span style={{ color: colors.textMuted }}>本周政策更新</span>} value={3} suffix="条" valueStyle={{ color: '#ffb800', fontSize: 18 }} />
+              <Statistic title={<span style={{ color: colors.textMuted }}>本周政策更新</span>} value={policyUpdates.length} suffix="条" valueStyle={{ color: '#ffb800', fontSize: 18 }} />
             </Card>
           </Col>
         </Row>
@@ -156,6 +203,7 @@ export default function MarketIntelligenceTab() {
 
       <Col xs={24} lg={10}>
         <AgentChatPanel
+          agentKey={agent.key}
           agentName={agent.name}
           systemPrompt={agent.systemPrompt}
           suggestions={[

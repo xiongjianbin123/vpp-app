@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import { Row, Col, Card, Table, Tag, Progress, Badge, Statistic } from 'antd';
 import { LinkOutlined, WarningOutlined } from '@ant-design/icons';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
@@ -8,11 +9,13 @@ import { agents } from './agentMockData';
 import { mockDevices } from '../../mock/data';
 import type { Device } from '../../mock/data';
 import { Button } from 'antd';
+import { callAgentAction } from '../../services/agentApi';
+import FileUpload from '../../components/FileUpload';
 
 const agent = agents.find(a => a.key === 'ops-guardian')!;
 
 // SOH trend data (mock)
-const sohTrend = [
+const mockSohTrend = [
   { month: '2025-10', 富山站: 98.2, 聚龙站: 97.8, 化龙站: 96.5 },
   { month: '2025-12', 富山站: 97.5, 聚龙站: 97.1, 化龙站: 95.2 },
   { month: '2026-02', 富山站: 96.8, 聚龙站: 96.4, 化龙站: 93.8 },
@@ -48,11 +51,40 @@ const priorityConfig = {
 export default function OpsGuardianTab() {
   const { colors } = useTheme();
   const navigate = useNavigate();
+  const [uploadDataId, setUploadDataId] = useState<string | null>(null);
 
-  // Filter storage devices from mock data
-  const storageDevices = mockDevices.filter((d: Device) =>
+  // Filter storage devices from mock data as default
+  const defaultDevices = mockDevices.filter((d: Device) =>
     d.type === '电网储能' || d.type === '储能系统'
   ).slice(0, 7);
+
+  const [devices, setDevices] = useState(defaultDevices);
+  const [sohTrend, setSohTrend] = useState(mockSohTrend);
+  const [workOrders, setWorkOrders] = useState<WorkOrder[]>(mockWorkOrders);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const result = await callAgentAction<{
+          devices: Device[];
+          alerts: typeof mockSohTrend;
+          workOrders: WorkOrder[];
+        }>(
+          'ops-guardian', 'analyze',
+          { dataId: uploadDataId }
+        );
+        if (result.success && result.data) {
+          if (result.data.devices) setDevices(result.data.devices);
+          if (result.data.alerts) setSohTrend(result.data.alerts);
+          if (result.data.workOrders) setWorkOrders(result.data.workOrders);
+        }
+      } catch {
+        // keep mock data
+      }
+    };
+    fetchData();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [uploadDataId]);
 
   const statusColors: Record<string, string> = {
     '在线': '#00ff88', '离线': '#4a5568', '维护': '#ffb800', '告警': '#ff4d4f', '在建': '#1890ff',
@@ -82,17 +114,25 @@ export default function OpsGuardianTab() {
     { title: '预计处理', dataIndex: 'eta', key: 'eta' },
   ];
 
-  const onlineCount = storageDevices.filter((d: Device) => d.status === '在线').length;
-  const alertCount = storageDevices.filter((d: Device) => d.status === '告警').length;
+  const onlineCount = devices.filter((d: Device) => d.status === '在线').length;
+  const alertCount = devices.filter((d: Device) => d.status === '告警').length;
 
   return (
     <Row gutter={16}>
       <Col xs={24} lg={14}>
+        {/* FileUpload */}
+        <div style={{ marginBottom: 16 }}>
+          <FileUpload
+            agentKey="ops-guardian"
+            onUploadComplete={(dataId) => setUploadDataId(dataId)}
+          />
+        </div>
+
         {/* Summary */}
         <Row gutter={16} style={{ marginBottom: 16 }}>
           <Col span={6}>
             <Card size="small" style={{ background: colors.bgCard, borderColor: colors.primaryBorder, textAlign: 'center' }}>
-              <Statistic title={<span style={{ color: colors.textMuted }}>在线设备</span>} value={onlineCount} suffix={`/ ${storageDevices.length}`} valueStyle={{ color: '#00ff88' }} />
+              <Statistic title={<span style={{ color: colors.textMuted }}>在线设备</span>} value={onlineCount} suffix={`/ ${devices.length}`} valueStyle={{ color: '#00ff88' }} />
             </Card>
           </Col>
           <Col span={6}>
@@ -107,7 +147,7 @@ export default function OpsGuardianTab() {
           </Col>
           <Col span={6}>
             <Card size="small" style={{ background: colors.bgCard, borderColor: colors.primaryBorder, textAlign: 'center' }}>
-              <Statistic title={<span style={{ color: colors.textMuted }}>待处理工单</span>} value={mockWorkOrders.length} valueStyle={{ color: '#ffb800' }} />
+              <Statistic title={<span style={{ color: colors.textMuted }}>待处理工单</span>} value={workOrders.length} valueStyle={{ color: '#ffb800' }} />
             </Card>
           </Col>
         </Row>
@@ -118,7 +158,7 @@ export default function OpsGuardianTab() {
           size="small"
           style={{ background: colors.bgCard, borderColor: colors.primaryBorder, marginBottom: 16 }}
         >
-          <Table columns={deviceColumns} dataSource={storageDevices.map((d: Device) => ({ ...d, key: d.id }))} size="small" pagination={false} />
+          <Table columns={deviceColumns} dataSource={devices.map((d: Device) => ({ ...d, key: d.id }))} size="small" pagination={false} />
         </Card>
 
         {/* SOH Trend */}
@@ -147,7 +187,7 @@ export default function OpsGuardianTab() {
           size="small"
           style={{ background: colors.bgCard, borderColor: colors.primaryBorder, marginBottom: 16 }}
         >
-          <Table columns={orderColumns} dataSource={mockWorkOrders} size="small" pagination={false} />
+          <Table columns={orderColumns} dataSource={workOrders} size="small" pagination={false} />
         </Card>
 
         <Button icon={<LinkOutlined />} onClick={() => navigate('/devices')} style={{ color: colors.primary }}>
@@ -157,6 +197,7 @@ export default function OpsGuardianTab() {
 
       <Col xs={24} lg={10}>
         <AgentChatPanel
+          agentKey={agent.key}
           agentName={agent.name}
           systemPrompt={agent.systemPrompt}
           suggestions={[

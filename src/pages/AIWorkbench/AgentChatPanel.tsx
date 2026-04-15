@@ -1,13 +1,14 @@
 import { useState, useRef, useEffect } from 'react';
-import { Input, Button, Spin, Tag, message } from 'antd';
+import { Input, Button, Spin, Tag } from 'antd';
 import { SendOutlined, RobotOutlined, UserOutlined, ClearOutlined } from '@ant-design/icons';
-import { streamAI, loadAIConfig } from '../../services/aiService';
+import { streamAgentChat, loadChatHistory, saveChatHistory, clearChatHistory } from '../../services/agentApi';
 import type { ChatMessage } from '../../services/aiService';
 import { useTheme } from '../../context/ThemeContext';
 
 const { TextArea } = Input;
 
 interface Props {
+  agentKey: string;
   agentName: string;
   systemPrompt: string;
   suggestions?: string[];
@@ -20,12 +21,25 @@ interface DisplayMessage {
   streaming?: boolean;
 }
 
-export default function AgentChatPanel({ agentName, systemPrompt, suggestions = [] }: Props) {
+export default function AgentChatPanel({ agentKey, agentName, systemPrompt, suggestions = [] }: Props) {
   const { colors } = useTheme();
   const [messages, setMessages] = useState<DisplayMessage[]>([]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    loadChatHistory(agentKey).then(history => {
+      if (history.length > 0) {
+        setMessages(history.map((m, i) => ({
+          id: `restored-${i}`,
+          role: m.role,
+          text: m.content,
+          streaming: false,
+        })));
+      }
+    });
+  }, [agentKey]);
 
   useEffect(() => {
     if (listRef.current) {
@@ -35,12 +49,6 @@ export default function AgentChatPanel({ agentName, systemPrompt, suggestions = 
 
   const send = async (text: string) => {
     if (!text.trim() || loading) return;
-
-    const config = loadAIConfig();
-    if (!config.apiKey) {
-      message.warning('请先在知识库页面配置AI API Key');
-      return;
-    }
 
     const userMsg: DisplayMessage = { id: Date.now().toString(), role: 'user', text: text.trim() };
     const assistantMsg: DisplayMessage = { id: (Date.now() + 1).toString(), role: 'assistant', text: '', streaming: true };
@@ -56,15 +64,23 @@ export default function AgentChatPanel({ agentName, systemPrompt, suggestions = 
 
     try {
       let accumulated = '';
-      for await (const chunk of streamAI(config, systemPrompt, history, 2048)) {
+      for await (const chunk of streamAgentChat(agentKey, history, systemPrompt)) {
         accumulated += chunk;
         setMessages(prev =>
           prev.map(m => m.id === assistantMsg.id ? { ...m, text: accumulated } : m)
         );
       }
-      setMessages(prev =>
-        prev.map(m => m.id === assistantMsg.id ? { ...m, streaming: false } : m)
-      );
+      setMessages(prev => {
+        const finalMessages = prev.map(m =>
+          m.id === assistantMsg.id ? { ...m, streaming: false } : m
+        );
+        // Save chat history after streaming completes
+        const chatMessages = finalMessages
+          .filter(m => !m.streaming)
+          .map(m => ({ role: m.role, content: m.text }));
+        saveChatHistory(agentKey, chatMessages);
+        return finalMessages;
+      });
     } catch (err) {
       setMessages(prev =>
         prev.map(m => m.id === assistantMsg.id
@@ -95,7 +111,7 @@ export default function AgentChatPanel({ agentName, systemPrompt, suggestions = 
           type="text"
           size="small"
           icon={<ClearOutlined />}
-          onClick={() => setMessages([])}
+          onClick={() => { setMessages([]); clearChatHistory(agentKey); }}
           style={{ color: colors.textMuted }}
         >
           清空

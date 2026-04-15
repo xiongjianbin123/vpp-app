@@ -5,6 +5,8 @@ import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../../context/ThemeContext';
 import AgentChatPanel from './AgentChatPanel';
 import { agents } from './agentMockData';
+import { callAgentAction } from '../../services/agentApi';
+import FileUpload from '../../components/FileUpload';
 
 const agent = agents.find(a => a.key === 'customer-profiler')!;
 
@@ -36,13 +38,27 @@ export default function CustomerProfilerTab() {
   const navigate = useNavigate();
   const [results, setResults] = useState<CustomerResult[]>([]);
   const [searching, setSearching] = useState(false);
+  const [selectedIndustries, setSelectedIndustries] = useState<string[]>(['氧化铝', '钢铁']);
+  const [selectedProvinces, setSelectedProvinces] = useState<string[]>(['山西', '广东']);
+  const [uploadDataId, setUploadDataId] = useState<string | null>(null);
 
-  const onSearch = () => {
+  const onSearch = async () => {
     setSearching(true);
-    setTimeout(() => {
+    try {
+      const result = await callAgentAction<{ customers: CustomerResult[] }>(
+        'customer-profiler', 'search',
+        { industries: selectedIndustries, provinces: selectedProvinces, dataId: uploadDataId }
+      );
+      if (result.success && result.data?.customers) {
+        setResults(result.data.customers);
+      } else {
+        setResults(mockResults); // fallback to mock
+      }
+    } catch {
       setResults(mockResults);
+    } finally {
       setSearching(false);
-    }, 1200);
+    }
   };
 
   const columns = [
@@ -63,6 +79,10 @@ export default function CustomerProfilerTab() {
           style={{ background: colors.bgCard, borderColor: colors.primaryBorder, marginBottom: 16 }}
           size="small"
         >
+          <FileUpload
+            agentKey="customer-profiler"
+            onUploadComplete={(dataId) => setUploadDataId(dataId)}
+          />
           <Form layout="inline" style={{ marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
             <Form.Item label={<span style={{ color: colors.textSecondary }}>目标行业</span>}>
               <Select
@@ -70,7 +90,8 @@ export default function CustomerProfilerTab() {
                 placeholder="选择行业"
                 style={{ minWidth: 200 }}
                 options={industries.map(i => ({ label: i, value: i }))}
-                defaultValue={['氧化铝', '钢铁']}
+                value={selectedIndustries}
+                onChange={setSelectedIndustries}
               />
             </Form.Item>
             <Form.Item label={<span style={{ color: colors.textSecondary }}>目标省份</span>}>
@@ -79,7 +100,8 @@ export default function CustomerProfilerTab() {
                 placeholder="选择省份"
                 style={{ minWidth: 200 }}
                 options={provinces.map(p => ({ label: p, value: p }))}
-                defaultValue={['山西', '广东']}
+                value={selectedProvinces}
+                onChange={setSelectedProvinces}
               />
             </Form.Item>
             <Form.Item>
@@ -109,6 +131,7 @@ export default function CustomerProfilerTab() {
 
       <Col xs={24} lg={10}>
         <AgentChatPanel
+          agentKey={agent.key}
           agentName={agent.name}
           systemPrompt={agent.systemPrompt}
           suggestions={[

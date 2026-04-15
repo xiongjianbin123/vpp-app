@@ -68,6 +68,29 @@ CREATE TABLE IF NOT EXISTS news (
   tags            JSONB        NOT NULL DEFAULT '[]',
   created_at      TIMESTAMPTZ  NOT NULL DEFAULT NOW()
 );
+
+-- Agent chat history
+CREATE TABLE IF NOT EXISTS agent_chat_history (
+  id          SERIAL PRIMARY KEY,
+  user_id     INTEGER      NOT NULL,
+  agent_key   VARCHAR(50)  NOT NULL,
+  messages    JSONB        NOT NULL DEFAULT '[]',
+  created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  updated_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW(),
+  UNIQUE (user_id, agent_key)
+);
+
+-- Agent file uploads
+CREATE TABLE IF NOT EXISTS agent_uploads (
+  id          UUID         PRIMARY KEY,
+  user_id     INTEGER      NOT NULL,
+  agent_key   VARCHAR(50)  NOT NULL,
+  file_name   VARCHAR(255) NOT NULL,
+  parsed_data JSONB        NOT NULL DEFAULT '[]',
+  row_count   INTEGER      NOT NULL DEFAULT 0,
+  columns     JSONB        NOT NULL DEFAULT '[]',
+  created_at  TIMESTAMPTZ  NOT NULL DEFAULT NOW()
+);
 `;
 
 async function migrate() {

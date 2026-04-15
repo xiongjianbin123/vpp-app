@@ -1,7 +1,7 @@
 import Anthropic from '@anthropic-ai/sdk';
 import OpenAI from 'openai';
 
-export type AIProvider = 'anthropic' | 'deepseek' | 'qwen' | 'kimi';
+export type AIProvider = 'anthropic' | 'deepseek' | 'qwen' | 'kimi' | 'minimax';
 
 export interface AIModel {
   id: string;
@@ -54,6 +54,16 @@ export const AI_PROVIDERS: Record<AIProvider, {
     models: [
       { id: 'moonshot-v1-8k', label: 'Moonshot 8K（标准）', provider: 'kimi' },
       { id: 'moonshot-v1-32k', label: 'Moonshot 32K（长文）', provider: 'kimi' },
+    ],
+  },
+  minimax: {
+    label: 'MiniMax',
+    baseURL: 'https://api.minimaxi.com/v1',
+    helpURL: 'https://platform.minimaxi.com',
+    keyPlaceholder: 'eyJhbGci...',
+    models: [
+      { id: 'MiniMax-M2', label: 'MiniMax M2（标准）', provider: 'minimax' },
+      { id: 'MiniMax-M2.5', label: 'MiniMax M2.5（均衡）', provider: 'minimax' },
     ],
   },
 };

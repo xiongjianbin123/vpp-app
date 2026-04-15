@@ -6,6 +6,8 @@ import { useNavigate } from 'react-router-dom';
 import { useTheme } from '../../context/ThemeContext';
 import AgentChatPanel from './AgentChatPanel';
 import { agents } from './agentMockData';
+import { callAgentAction } from '../../services/agentApi';
+import FileUpload from '../../components/FileUpload';
 
 const agent = agents.find(a => a.key === 'revenue-calculator')!;
 
@@ -24,13 +26,26 @@ const mockScenarios: ScenarioResult[] = [
   { key: '4', scenario: '碳交易', annualRevenue: 3.2, enabled: true, note: '碳价80元/t，减排400tCO2' },
 ];
 
-const monteCarloData = [
+interface MonteCarloRow {
+  range: string;
+  irr: number;
+  npv: number;
+  payback: number;
+}
+
+const mockMonteCarloData: MonteCarloRow[] = [
   { range: 'P10（悲观）', irr: 6.2, npv: 45, payback: 8.1 },
   { range: 'P50（中性）', irr: 10.8, npv: 128, payback: 5.6 },
   { range: 'P90（乐观）', irr: 15.4, npv: 215, payback: 4.2 },
 ];
 
-const chartData = [
+interface ChartRow {
+  year: string;
+  收入: number;
+  成本: number;
+}
+
+const mockChartData: ChartRow[] = [
   { year: '第1年', 收入: 102.8, 成本: 185 },
   { year: '第2年', 收入: 100.9, 成本: 15 },
   { year: '第3年', 收入: 99.1, 成本: 15 },
@@ -48,13 +63,48 @@ export default function RevenueCalculatorTab() {
   const navigate = useNavigate();
   const [calculated, setCalculated] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [scenarios, setScenarios] = useState<ScenarioResult[]>(mockScenarios);
+  const [monteCarloData, setMonteCarloData] = useState<MonteCarloRow[]>(mockMonteCarloData);
+  const [chartData, setChartData] = useState<ChartRow[]>(mockChartData);
+  const [uploadDataId, setUploadDataId] = useState<string | null>(null);
 
-  const onCalculate = () => {
+  // Controlled form state
+  const [power, setPower] = useState(2);
+  const [capacity, setCapacity] = useState(4);
+  const [province, setProvince] = useState('广东');
+  const [projectType, setProjectType] = useState('工商业储能');
+  const [contractYears, setContractYears] = useState(10);
+  const [simCount, setSimCount] = useState(10000);
+
+  const onCalculate = async () => {
     setLoading(true);
-    setTimeout(() => {
+    try {
+      const result = await callAgentAction<{
+        scenarios: ScenarioResult[];
+        monteCarlo: MonteCarloRow[];
+        chartData: ChartRow[];
+      }>(
+        'revenue-calculator', 'calculate',
+        { power, capacity, province, projectType, contractYears, simCount, dataId: uploadDataId }
+      );
+      if (result.success && result.data) {
+        if (result.data.scenarios) setScenarios(result.data.scenarios);
+        if (result.data.monteCarlo) setMonteCarloData(result.data.monteCarlo);
+        if (result.data.chartData) setChartData(result.data.chartData);
+      } else {
+        // fallback to mock
+        setScenarios(mockScenarios);
+        setMonteCarloData(mockMonteCarloData);
+        setChartData(mockChartData);
+      }
+    } catch {
+      setScenarios(mockScenarios);
+      setMonteCarloData(mockMonteCarloData);
+      setChartData(mockChartData);
+    } finally {
       setCalculated(true);
       setLoading(false);
-    }, 1500);
+    }
   };
 
   return (
@@ -66,21 +116,25 @@ export default function RevenueCalculatorTab() {
           size="small"
           style={{ background: colors.bgCard, borderColor: colors.primaryBorder, marginBottom: 16 }}
         >
+          <FileUpload
+            agentKey="revenue-calculator"
+            onUploadComplete={(dataId) => setUploadDataId(dataId)}
+          />
           <Form layout="vertical">
             <Row gutter={16}>
               <Col span={8}>
                 <Form.Item label={<span style={{ color: colors.textSecondary }}>储能功率 (MW)</span>}>
-                  <InputNumber defaultValue={2} min={0.1} step={0.5} style={{ width: '100%' }} />
+                  <InputNumber value={power} onChange={v => setPower(v ?? 2)} min={0.1} step={0.5} style={{ width: '100%' }} />
                 </Form.Item>
               </Col>
               <Col span={8}>
                 <Form.Item label={<span style={{ color: colors.textSecondary }}>储能容量 (MWh)</span>}>
-                  <InputNumber defaultValue={4} min={0.2} step={1} style={{ width: '100%' }} />
+                  <InputNumber value={capacity} onChange={v => setCapacity(v ?? 4)} min={0.2} step={1} style={{ width: '100%' }} />
                 </Form.Item>
               </Col>
               <Col span={8}>
                 <Form.Item label={<span style={{ color: colors.textSecondary }}>所在省份</span>}>
-                  <Select defaultValue="广东" options={[
+                  <Select value={province} onChange={setProvince} options={[
                     { label: '广东', value: '广东' }, { label: '山东', value: '山东' },
                     { label: '山西', value: '山西' }, { label: '浙江', value: '浙江' },
                   ]} />
@@ -88,7 +142,7 @@ export default function RevenueCalculatorTab() {
               </Col>
               <Col span={8}>
                 <Form.Item label={<span style={{ color: colors.textSecondary }}>项目类型</span>}>
-                  <Select defaultValue="工商业储能" options={[
+                  <Select value={projectType} onChange={setProjectType} options={[
                     { label: '工商业储能', value: '工商业储能' },
                     { label: '独立储能(>50MW)', value: '独立储能' },
                     { label: '用户侧储能(<1MW)', value: '用户侧储能' },
@@ -97,12 +151,12 @@ export default function RevenueCalculatorTab() {
               </Col>
               <Col span={8}>
                 <Form.Item label={<span style={{ color: colors.textSecondary }}>EMC合同期 (年)</span>}>
-                  <InputNumber defaultValue={10} min={3} max={20} style={{ width: '100%' }} />
+                  <InputNumber value={contractYears} onChange={v => setContractYears(v ?? 10)} min={3} max={20} style={{ width: '100%' }} />
                 </Form.Item>
               </Col>
               <Col span={8}>
                 <Form.Item label={<span style={{ color: colors.textSecondary }}>Monte Carlo模拟次数</span>}>
-                  <InputNumber defaultValue={10000} min={1000} step={1000} style={{ width: '100%' }} />
+                  <InputNumber value={simCount} onChange={v => setSimCount(v ?? 10000)} min={1000} step={1000} style={{ width: '100%' }} />
                 </Form.Item>
               </Col>
             </Row>
@@ -116,7 +170,7 @@ export default function RevenueCalculatorTab() {
           <>
             {/* Monte Carlo Results */}
             <Card
-              title={<span style={{ color: colors.textPrimary }}>Monte Carlo模拟结果（10,000次）</span>}
+              title={<span style={{ color: colors.textPrimary }}>Monte Carlo模拟结果（{simCount.toLocaleString()}次）</span>}
               size="small"
               style={{ background: colors.bgCard, borderColor: colors.primaryBorder, marginBottom: 16 }}
             >
@@ -152,7 +206,7 @@ export default function RevenueCalculatorTab() {
                     render: (v: boolean) => v ? <Tag color="#00ff88">已计入</Tag> : <Tag color="#ff4d4f">不适用</Tag> },
                   { title: '说明', dataIndex: 'note', key: 'note', render: (v: string) => <span style={{ color: colors.textSecondary, fontSize: 12 }}>{v}</span> },
                 ]}
-                dataSource={mockScenarios}
+                dataSource={scenarios}
                 size="small"
                 pagination={false}
               />
@@ -160,7 +214,7 @@ export default function RevenueCalculatorTab() {
 
             {/* Revenue Chart */}
             <Card
-              title={<span style={{ color: colors.textPrimary }}>10年收入 vs 成本</span>}
+              title={<span style={{ color: colors.textPrimary }}>{contractYears}年收入 vs 成本</span>}
               size="small"
               style={{ background: colors.bgCard, borderColor: colors.primaryBorder, marginBottom: 16 }}
             >
@@ -186,6 +240,7 @@ export default function RevenueCalculatorTab() {
 
       <Col xs={24} lg={10}>
         <AgentChatPanel
+          agentKey={agent.key}
           agentName={agent.name}
           systemPrompt={agent.systemPrompt}
           suggestions={[

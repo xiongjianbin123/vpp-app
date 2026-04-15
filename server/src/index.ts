@@ -14,6 +14,8 @@ import tasksRouter from './routes/tasks';
 import dashboardRouter from './routes/dashboard';
 import revenueRouter from './routes/revenue';
 import newsRouter from './routes/news';
+import agentRouter from './routes/agent';
+import { requireAuth } from './middleware/auth';
 
 const app = express();
 const PORT = process.env.PORT ?? 3001;
@@ -46,6 +48,7 @@ app.use('/api/tasks', tasksRouter);
 app.use('/api/dashboard', dashboardRouter);
 app.use('/api/revenue', revenueRouter);
 app.use('/api/news', newsRouter);
+app.use('/api/agent', requireAuth, agentRouter);
 
 // Health check
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', time: new Date().toISOString() }));
