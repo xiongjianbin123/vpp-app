@@ -62,8 +62,11 @@ export const AI_PROVIDERS: Record<AIProvider, {
     helpURL: 'https://platform.minimaxi.com',
     keyPlaceholder: 'eyJhbGci...',
     models: [
-      { id: 'MiniMax-M2', label: 'MiniMax M2（标准）', provider: 'minimax' },
+      { id: 'MiniMax-M2.7', label: 'MiniMax M2.7（最强）', provider: 'minimax' },
+      { id: 'MiniMax-M2.7-highspeed', label: 'MiniMax M2.7 高速版', provider: 'minimax' },
       { id: 'MiniMax-M2.5', label: 'MiniMax M2.5（均衡）', provider: 'minimax' },
+      { id: 'MiniMax-M2.5-highspeed', label: 'MiniMax M2.5 高速版', provider: 'minimax' },
+      { id: 'MiniMax-M2.1', label: 'MiniMax M2.1（轻量）', provider: 'minimax' },
     ],
   },
 };
@@ -142,18 +145,31 @@ export async function* streamAI(
     apiKey,
     baseURL: providerConf.baseURL,
     dangerouslyAllowBrowser: true,
+    timeout: 60_000,
+    maxRetries: 1,
   });
-  const stream = await client.chat.completions.create({
-    model: modelId,
-    max_tokens: maxTokens,
-    stream: true,
-    messages: [
-      { role: 'system', content: system },
-      ...messages.map(m => ({ role: m.role, content: m.content })),
-    ],
-  });
-  for await (const chunk of stream) {
-    const delta = chunk.choices[0]?.delta?.content;
-    if (delta) yield delta;
+  try {
+    const stream = await client.chat.completions.create({
+      model: modelId,
+      max_tokens: maxTokens,
+      stream: true,
+      messages: [
+        { role: 'system', content: system },
+        ...messages.map(m => ({ role: m.role, content: m.content })),
+      ],
+    });
+    for await (const chunk of stream) {
+      const delta = chunk.choices[0]?.delta?.content;
+      if (delta) yield delta;
+    }
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    if (msg.includes('Connection error') || msg.includes('fetch')) {
+      throw new Error(
+        `无法连接到 ${providerConf.label} API (${providerConf.baseURL})。` +
+        `请检查：1) API Key 是否正确  2) 网络是否可访问该地址  3) 模型ID "${modelId}" 是否有效`,
+      );
+    }
+    throw err;
   }
 }
